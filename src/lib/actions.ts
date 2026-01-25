@@ -31,10 +31,20 @@ export async function createProject(name: string, initialNote?: string) {
 }
 
 export async function deleteProject(id: string) {
+    const project = await prisma.project.findUnique({
+        where: { id },
+        select: { isArchived: true }
+    });
+
+    if (!project?.isArchived) {
+        throw new Error("Aktive Projekte können nicht direkt gelöscht werden.");
+    }
+
     await prisma.project.delete({
         where: { id },
     });
     revalidatePath("/");
+    revalidatePath("/archive");
 }
 
 export async function updateProjectStatus(id: string, isArchived: boolean) {

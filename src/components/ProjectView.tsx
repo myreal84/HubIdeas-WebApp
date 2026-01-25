@@ -11,7 +11,6 @@ import {
     CheckSquare,
     StickyNote,
     Archive,
-    RotateCcw,
     MessageSquare,
     Sparkles,
     X,
@@ -20,14 +19,13 @@ import {
 import Link from "next/link";
 import { Project, Todo, Note } from "@/lib/types";
 import ProjectChat from "./ProjectChat";
-import { ThemeToggle } from "./ThemeToggle";
+import ProjectMenu from "./ProjectMenu";
 import {
     addTodo,
     toggleTodo,
     deleteTodo,
     addNote,
     deleteNote,
-    updateProjectStatus,
     updateTodo,
     updateNote
 } from "@/lib/actions";
@@ -89,9 +87,6 @@ export default function ProjectView({ project }: ProjectViewProps) {
         setEditContent("");
     };
 
-    const handleToggleStatus = async () => {
-        await updateProjectStatus(project.id, !project.isArchived);
-    };
 
     // Sort todos: active first, then completed (both by creation date)
     const sortedTodos = [...project.todos].sort((a, b) => {
@@ -103,13 +98,13 @@ export default function ProjectView({ project }: ProjectViewProps) {
 
     return (
         <div className="main-container animate-fade-in pb-16">
-            <header className="mb-8 lg:mb-16 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 lg:gap-8">
+            <header className="mb-8 lg:mb-16">
                 <div className="flex items-center gap-4 lg:gap-6">
                     <Link href="/" className="group p-3 lg:p-4 bg-foreground/5 hover:bg-primary/20 rounded-2xl transition-all border border-border backdrop-blur-md shadow-xl">
                         <ArrowLeft size={20} className="lg:w-6 lg:h-6 group-hover:-translate-x-1 transition-transform text-muted-foreground group-hover:text-primary" />
                     </Link>
                     <div className="flex-1 min-w-0">
-                        <h1 className={`text-2xl md:text-5xl lg:text-6xl font-black title-font tracking-tight leading-tight line-clamp-2 ${project.isArchived ? 'opacity-30 line-through' : 'text-foreground'}`}>
+                        <h1 className={`text-2xl md:text-5xl lg:text-3xl font-black title-font tracking-tight leading-tight line-clamp-2 ${project.isArchived ? 'opacity-30 line-through' : 'text-foreground'}`}>
                             {project.name}
                         </h1>
                         <div className="flex items-center gap-3 mt-1 lg:mt-3">
@@ -124,35 +119,6 @@ export default function ProjectView({ project }: ProjectViewProps) {
                             )}
                         </div>
                     </div>
-                </div>
-                <div className="flex flex-row lg:flex-col gap-3 flex-shrink-0">
-                    <div className="flex-1 lg:flex-none">
-                        <ThemeToggle />
-                    </div>
-                    <button
-                        onClick={handleToggleStatus}
-                        className={`flex-1 lg:flex-none flex items-center justify-center gap-2 lg:gap-3 px-4 lg:px-8 py-3 lg:py-4 rounded-2xl text-[10px] lg:text-sm font-black uppercase tracking-widest transition-all shadow-xl group ${project.isArchived
-                            ? 'bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20'
-                            : 'bg-foreground/5 text-muted-foreground border border-border hover:text-foreground hover:bg-foreground/10'
-                            }`}
-                    >
-                        {project.isArchived ? <RotateCcw className="w-4 h-4 lg:w-[18px] lg:h-[18px] group-hover:-rotate-45 transition-transform" /> : <Archive className="w-4 h-4 lg:w-[18px] lg:h-[18px] group-hover:scale-110 transition-transform" />}
-                        <span className="truncate">{project.isArchived ? 'Reakt.' : 'Archiv'}</span>
-                        <span className="hidden lg:inline">{project.isArchived ? 'ivieren' : 'ieren'}</span>
-                    </button>
-                    {!project.isArchived && (
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsChatOpen(true);
-                            }}
-                            className="hidden lg:flex items-center justify-center gap-3 px-10 py-5 rounded-[1.5rem] text-sm font-bold uppercase tracking-widest transition-all shadow-2xl group bg-gradient-to-br from-primary to-accent text-white hover:brightness-110 hover:scale-[1.05] active:scale-[0.98] cursor-pointer relative z-[9999] border border-primary/20"
-                        >
-                            <Sparkles className="w-5 h-5 animate-pulse" />
-                            <span>Chat Assistent</span>
-                        </button>
-                    )}
                 </div>
             </header>
 
@@ -460,6 +426,13 @@ export default function ProjectView({ project }: ProjectViewProps) {
                 </div>,
                 document.body
             )}
+
+            <ProjectMenu
+                projectId={project.id}
+                projectName={project.name}
+                isArchived={project.isArchived}
+                onOpenChat={() => setIsChatOpen(true)}
+            />
         </div>
     );
 }
