@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HubIdeas 🚀
 
-## Getting Started
+Vom Gedanken zum Projekt – alles im Fluss.
 
-First, run the development server:
+HubIdeas ist eine minimalistische, lokale Web-App zur Organisation von Projekten, To-Dos und Gedanken. Sie ist darauf ausgelegt, schnell, privat und ablenkungsfrei zu sein.
 
+## Features
+
+- ⚡ **Schnelle Erfassung**: Projekte und Aufgaben im Handumdrehen anlegen.
+- 🧠 **Gedanken-Speicher**: Ein dedizierter Bereich für lose Ideen und Konzepte pro Projekt.
+- 🌓 **Design-Switch**: Wähle zwischen einem eleganten Dark-Mode und einem frischen Light-Mode.
+- 🤖 **KI-Assistent**: Integriertes Gemini-Modell für To-Do-Vorschläge und Projekt-Impulse.
+- 🔔 **Push-Erinnerungen**: Lass dich sanft an Projekte erinnern, die du länger nicht geöffnet hast.
+- 🛡️ **Privatsphäre**: Lokal hostbar, keine Cloud-Abhängigkeit für deine Daten.
+
+## Tech Stack
+
+- **Framework**: [Next.js 15+](https://nextjs.org) (App Router)
+- **Styling**: Tailwind CSS
+- **Datenbank**: SQLite mit [Prisma](https://prisma.io)
+- **Authentifizierung**: [Auth.js (NextAuth)](https://authjs.dev)
+- **KI**: [Google SDK](https://ai.google.dev/) (Gemini API)
+
+## Installation & Setup
+
+### 1. Repository klonen
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/dein-username/hub-ideas.git
+cd hub-ideas
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Abhängigkeiten installieren
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Umgebungsvariablen konfigurieren
+Kopiere die `.env.example` und fülle die Werte aus:
+```bash
+cp .env.example .env
+```
+Generiere einen geheimen Schlüssel für `AUTH_SECRET`:
+```bash
+openssl rand -base64 32
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. Datenbank initialisieren
+```bash
+npx prisma migrate dev --name init
+```
 
-## Learn More
+### 5. Entwicklungsserver starten
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Besuche [http://localhost:3000](http://localhost:3000) im Browser.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Das Projekt enthält ein `start.sh`-Skript und ist für den Betrieb in einem Docker-Container oder direkt auf einem Linux-Server optimiert.
+Stelle sicher, dass alle Variablen in der `.env` gesetzt sind.
+```

@@ -1,0 +1,13 @@
+services:
+  hub-ideas:
+    build: .
+    container_name: hub-ideas
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./prisma/data:/app/prisma/data
+    env_file: .env
+    environment:
+      - DATABASE_URL=file:/app/prisma/data/hubideas.db
+      - AUTH_TRUST_HOST=true
+    restart: always
