@@ -6,27 +6,43 @@ HubIdeas ist eine minimalistische, lokale Web-App zur Organisation von Projekten
 
 ## Features
 
-- ⚡ **Schnelle Erfassung**: Projekte und Aufgaben im Handumdrehen anlegen.
-- 🧠 **Gedanken-Speicher**: Ein dedizierter Bereich für lose Ideen und Konzepte pro Projekt.
-- 🌓 **Design-Switch**: Wähle zwischen einem eleganten Dark-Mode und einem frischen Light-Mode.
-- 🤖 **KI-Assistent**: Integriertes Gemini-Modell für To-Do-Vorschläge und Projekt-Impulse.
-- 🔔 **Push-Erinnerungen**: Lass dich sanft an Projekte erinnern, die du länger nicht geöffnet hast.
-- 🛡️ **Privatsphäre**: Lokal hostbar, keine Cloud-Abhängigkeit für deine Daten.
+### ⚡ Produktivität & Organisation
+- **Schnelle Erfassung**: Projekte und Aufgaben im Handumdrehen anlegen.
+- **Gedanken-Speicher**: Ein dedizierter Bereich für lose Ideen und Konzepte pro Projekt.
+- **Project Sharing**: Teile Projekte mit anderen Nutzern und arbeite gemeinsam an Ideen. Die Urheber von Inhalten werden dabei transparent angezeigt.
+
+### 🤖 Smart AI Features (powered by Google Gemini)
+- **Auto-Suggestions**: Erhalte beim Erstellen eines Projekts sofrott 3 konkrete Handlungsschritte – optional deaktivierbar.
+- **Kontext-Chat**: Diskutiere deine Ideen mit einem KI-Assistenten, der den vollen Kontext deiner Notizen kennt.
+- **Resilient Resurfacing**: Intelligente Push-Erinnerungen für vergessene Projekte.
+    - *Smart Fallback*: Wenn das AI-Limit erreicht ist, motiviert das System mit charmanten Standard-Texten.
+- **Fair Use Limits**: Monatliche Token-Kontingente pro Nutzer sorgen für Kostenkontrolle.
+
+### 🎨 Design & UX
+- **Premium UI**: Modernes Interface mit Glassmorphism, Framer Motion Animationen und "Blobby"-Inputs.
+- **Adaptive Themes**: Wähle zwischen einem eleganten Dark-Mode ("Slate & Purple") und einem frischen Light-Mode.
+
+### 🛡️ Administration & Sicherheit
+- **Admin Dashboard**: Zentrale Verwaltung von Nutzern, Rollen und AI-Limits.
+- **Privatsphäre**: Lokal hostbar, volle Datenkontrolle.
+- **Blind Admin**: Technisch erzwungener Schutz der Projektinhalte – Administratoren sehen Metadaten, aber keine User-Daten.
+- **Transparenz**: Klare Hinweise zur Datenverarbeitung (keine E2EE für AI-Features).
 
 ## Tech Stack
 
 - **Framework**: [Next.js 15+](https://nextjs.org) (App Router)
-- **Styling**: Tailwind CSS
+- **UI**: Tailwind CSS, Framer Motion
 - **Datenbank**: SQLite mit [Prisma](https://prisma.io)
-- **Authentifizierung**: [Auth.js (NextAuth)](https://authjs.dev)
-- **KI**: [Google SDK](https://ai.google.dev/) (Gemini API)
+- **Auth**: [Auth.js (NextAuth)](https://authjs.dev)
+- **AI**: [Google AI SDK](https://ai.google.dev/)
+- **Notifications**: Web Push Protocol
 
 ## Installation & Setup
 
 ### 1. Repository klonen
 ```bash
-git clone https://github.com/dein-username/hub-ideas.git
-cd hub-ideas
+git clone https://github.com/myreal84/HubIdeas-WebApp.git
+cd HubIdeas-WebApp
 ```
 
 ### 2. Abhängigkeiten installieren
@@ -59,5 +75,4 @@ Besuche [http://localhost:3000](http://localhost:3000) im Browser.
 ## Deployment
 
 Das Projekt enthält ein `start.sh`-Skript und ist für den Betrieb in einem Docker-Container oder direkt auf einem Linux-Server optimiert.
-Stelle sicher, dass alle Variablen in der `.env` gesetzt sind.
-```
+Bei Updates einfach `git pull` und `./start.sh` (wenn vorhanden) oder `npm run build` ausführen.
