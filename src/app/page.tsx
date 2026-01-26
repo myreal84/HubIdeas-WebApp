@@ -1,49 +1,89 @@
-import { auth } from "@/auth";
+"use client";
+
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Sparkles } from "lucide-react";
 import ProjectForm from "@/components/ProjectForm";
-import { prisma } from "@/lib/prisma";
 import ProjectDashboard from "@/components/ProjectDashboard";
+import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
-export const dynamic = "force-dynamic";
+export default function DashboardPage() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-export default async function DashboardPage() {
-  const session = await auth();
-  if (!session) redirect("/login");
+  async function fetchData() {
+    if (!data) setLoading(true);
+    const res = await fetch('/api/dashboard');
+    const json = await res.json();
+    setData(json);
+    setLoading(false);
+  }
 
-  const activeProjects = (await prisma.project.findMany({
-    where: { isArchived: false },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      _count: {
-        select: { todos: { where: { isCompleted: false } } }
-      }
-    }
-  })) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  if (loading) return null;
+  if (!data.session) redirect("/login");
+
+  const { isAdmin, pendingUsersCount, activeProjects } = data;
 
   // Recommendation Logic: Pick a project not updated in 3 days
   const threeDaysAgo = new Date();
   threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-  const forgottenProjects = activeProjects.filter((p: any) => new Date(p.updatedAt) < threeDaysAgo); // eslint-disable-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const forgottenProjects = activeProjects.filter((p: any) => new Date(p.updatedAt) < threeDaysAgo);
   const recommendation = forgottenProjects.length > 0
     ? forgottenProjects[Math.floor(Math.random() * forgottenProjects.length)]
     : null;
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: "spring" as const,
+        stiffness: 300,
+        damping: 30
+      }
+    }
+  };
+
   return (
-    <div className="main-container animate-fade-in relative">
-      <header className="mb-16 flex flex-col md:flex-row justify-between items-start gap-8 mt-12">
+    <motion.div
+      className="main-container relative"
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      <motion.header
+        className="mb-8 md:mb-16 flex flex-col md:flex-row justify-between items-start gap-8 mt-6 md:mt-12"
+        variants={itemVariants}
+      >
         <div>
-          <h1 className="text-7xl md:text-8xl font-black title-font tracking-tight text-foreground mb-4">
+          <h1 className="text-5xl md:text-8xl font-black title-font tracking-tight text-foreground mb-4">
             HubIdeas
           </h1>
-          <p className="text-muted-foreground text-xl md:text-2xl font-medium max-w-lg leading-tight">Vom Gedanken zum Projekt – alles im Fluss.</p>
+          <p className="text-muted-foreground text-lg md:text-2xl font-medium max-w-lg leading-tight">Vom Gedanken zum Projekt – alles im Fluss.</p>
         </div>
-      </header>
+      </motion.header>
 
       {recommendation && (
-        <section className="mb-16 animate-fade-in group">
+        <motion.section className="mb-16 group" variants={itemVariants}>
           <Link
             href={`/project/${recommendation.id}`}
             className="block p-1 rounded-[2.5rem] bg-gradient-to-br from-accent/50 via-primary/30 to-transparent shadow-2xl hover:scale-[1.01] transition-all duration-500"
@@ -63,20 +103,23 @@ export default async function DashboardPage() {
               <ChevronRight className="text-accent opacity-0 group-hover:opacity-100 transition-all translate-x-[-20px] group-hover:translate-x-0" size={32} />
             </div>
           </Link>
-        </section>
+        </motion.section>
       )}
 
-      <section className="mb-24 flex justify-center">
+      <motion.section className="mb-24 flex justify-center" variants={itemVariants}>
         <div className="w-full max-w-2xl bg-foreground/5 backdrop-blur-xl rounded-[3rem] p-2 border border-border shadow-inner shadow-primary/10">
-          <ProjectForm />
+          <ProjectForm onProjectCreated={fetchData} />
         </div>
-      </section>
+      </motion.section>
 
-      <ProjectDashboard
-        initialProjects={activeProjects}
-        vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""}
-      />
-    </div>
+      <motion.div variants={itemVariants}>
+        <ProjectDashboard
+          initialProjects={activeProjects}
+          vapidPublicKey={data.vapidPublicKey || ""}
+          isAdmin={isAdmin}
+          pendingUsersCount={pendingUsersCount}
+        />
+      </motion.div>
+    </motion.div>
   );
 }
-

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ListChecks, ChevronRight, Sparkles, Zap, Clock, Search } from 'lucide-react';
 import MainMenu from './MainMenu';
 import { Project } from '@/lib/types';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ProjectWithCount extends Project {
     _count: {
@@ -15,9 +16,11 @@ interface ProjectWithCount extends Project {
 interface ProjectDashboardProps {
     initialProjects: ProjectWithCount[];
     vapidPublicKey: string;
+    isAdmin?: boolean;
+    pendingUsersCount?: number;
 }
 
-export default function ProjectDashboard({ initialProjects, vapidPublicKey }: ProjectDashboardProps) {
+export default function ProjectDashboard({ initialProjects, vapidPublicKey, isAdmin, pendingUsersCount }: ProjectDashboardProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [sortOption, setSortOption] = useState("smart");
     const [randomSeed, setRandomSeed] = useState(0);
@@ -92,28 +95,35 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey }: Pr
     }, [initialProjects, searchQuery, sortOption, randomSeed]);
 
     const renderProjectCard = (project: ProjectWithCount, idx: number) => (
-        <Link
+        <motion.div
             key={project.id}
-            href={`/project/${project.id}`}
-            className="card-premium group relative overflow-hidden flex flex-col justify-between min-h-[220px]"
-            style={{ animationDelay: `${idx * 50}ms` }}
+            layout
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ delay: idx * 0.05 }}
         >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[60px] rounded-full translate-x-1/2 -translate-y-1/2 group-hover:bg-primary/20 transition-all duration-500" />
+            <Link
+                href={`/project/${project.id}`}
+                className="card-premium group relative overflow-hidden flex flex-col justify-between min-h-[240px] h-full"
+            >
+                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 blur-[80px] rounded-full translate-x-1/2 -translate-y-1/2 group-hover:bg-primary/20 transition-all duration-700" />
 
-            <div className="relative z-10">
-                <h3 className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors mb-4 line-clamp-2">
-                    {project.name}
-                </h3>
-                <div className="flex items-center gap-2 text-muted-foreground font-bold text-xs bg-foreground/5 w-fit px-4 py-2 rounded-xl border border-border">
-                    <ListChecks size={14} className="text-primary" />
-                    <span>{project._count.todos} Aufgaben</span>
+                <div className="relative z-10">
+                    <h3 className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors mb-4 line-clamp-2">
+                        {project.name}
+                    </h3>
+                    <div className="flex items-center gap-2 text-muted-foreground font-bold text-[10px] uppercase tracking-wider bg-foreground/5 w-fit px-4 py-2 rounded-xl border border-border group-hover:bg-primary/5 group-hover:border-primary/20 transition-colors">
+                        <ListChecks size={14} className="text-primary" />
+                        <span>{project._count.todos} Aufgaben</span>
+                    </div>
                 </div>
-            </div>
 
-            <div className="relative z-10 flex items-center text-primary font-black text-[10px] uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0 mt-8">
-                Details <ChevronRight size={14} className="ml-1" />
-            </div>
-        </Link>
+                <div className="relative z-10 flex items-center text-primary font-black text-[11px] uppercase tracking-[0.2em] transform transition-all duration-500 group-hover:translate-x-2">
+                    Projekt öffnen <ChevronRight size={14} className="ml-1" />
+                </div>
+            </Link>
+        </motion.div>
     );
 
     return (
@@ -125,6 +135,8 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey }: Pr
                 setSortOption={setSortOption}
                 vapidPublicKey={vapidPublicKey}
                 activeCount={activeCount}
+                isAdmin={isAdmin}
+                pendingUsersCount={pendingUsersCount}
             />
 
             {sortOption === 'smart' ? (
@@ -139,9 +151,11 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey }: Pr
                                 </div>
                                 <div className="h-px flex-1 bg-gradient-to-r from-primary/20 to-transparent" />
                             </div>
-                            <div className="responsive-grid">
-                                {filteredAndSorted.zone1!.map((p, i) => renderProjectCard(p, i))}
-                            </div>
+                            <motion.div className="responsive-grid" layout>
+                                <AnimatePresence mode="popLayout">
+                                    {filteredAndSorted.zone1!.map((p, i) => renderProjectCard(p, i))}
+                                </AnimatePresence>
+                            </motion.div>
                         </section>
                     )}
 
@@ -155,9 +169,11 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey }: Pr
                                 </div>
                                 <div className="h-px flex-1 bg-gradient-to-r from-accent/20 to-transparent" />
                             </div>
-                            <div className="responsive-grid">
-                                {filteredAndSorted.zone2!.map((p, i) => renderProjectCard(p, i))}
-                            </div>
+                            <motion.div className="responsive-grid" layout>
+                                <AnimatePresence mode="popLayout">
+                                    {filteredAndSorted.zone2!.map((p, i) => renderProjectCard(p, i))}
+                                </AnimatePresence>
+                            </motion.div>
                         </section>
                     )}
 
@@ -171,9 +187,11 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey }: Pr
                                 </div>
                                 <div className="h-px flex-1 bg-gradient-to-r from-foreground/10 to-transparent" />
                             </div>
-                            <div className="responsive-grid">
-                                {filteredAndSorted.zone3!.map((p, i) => renderProjectCard(p, i))}
-                            </div>
+                            <motion.div className="responsive-grid" layout>
+                                <AnimatePresence mode="popLayout">
+                                    {filteredAndSorted.zone3!.map((p, i) => renderProjectCard(p, i))}
+                                </AnimatePresence>
+                            </motion.div>
                         </section>
                     )}
 
@@ -190,9 +208,11 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey }: Pr
                         <div className="h-px flex-1 bg-gradient-to-r from-foreground/10 to-transparent" />
                     </div>
                     {filteredAndSorted.all?.length === 0 ? <EmptyState /> : (
-                        <div className="responsive-grid">
-                            {filteredAndSorted.all!.map((p, i) => renderProjectCard(p, i))}
-                        </div>
+                        <motion.div className="responsive-grid" layout>
+                            <AnimatePresence mode="popLayout">
+                                {filteredAndSorted.all!.map((p, i) => renderProjectCard(p, i))}
+                            </AnimatePresence>
+                        </motion.div>
                     )}
                 </section>
             )}

@@ -13,10 +13,13 @@ import {
     Hash,
     Zap,
     Sparkles,
-    ArrowRight
+    ArrowRight,
+    Shield,
+    LogOut
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
+import { signOut } from 'next-auth/react';
 
 import PushManager from './PushManager';
 
@@ -27,6 +30,8 @@ interface MainMenuProps {
     setSortOption: (option: string) => void;
     vapidPublicKey: string;
     activeCount: number;
+    isAdmin?: boolean;
+    pendingUsersCount?: number;
 }
 
 export default function MainMenu({
@@ -35,7 +40,9 @@ export default function MainMenu({
     sortOption,
     setSortOption,
     vapidPublicKey,
-    activeCount
+    activeCount,
+    isAdmin,
+    pendingUsersCount = 0
 }: MainMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const { theme, setTheme } = useTheme();
@@ -54,8 +61,8 @@ export default function MainMenu({
             >
                 <div className="relative">
                     <MenuIcon size={20} className="group-hover:rotate-12 transition-transform" />
-                    {activeCount > 0 && (
-                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary rounded-full border-2 border-background" />
+                    {(activeCount > 0 || pendingUsersCount > 0) && (
+                        <div className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-background ${pendingUsersCount > 0 ? 'bg-amber-500' : 'bg-primary'}`} />
                     )}
                 </div>
             </button>
@@ -168,10 +175,52 @@ export default function MainMenu({
                             </Link>
                         </div>
 
+                        {isAdmin && (
+                            <div className="mb-12">
+                                <label className="block text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Administration</label>
+                                <Link
+                                    href="/admin"
+                                    onClick={() => setIsOpen(false)}
+                                    className="flex items-center justify-between p-5 bg-amber-500/5 border border-amber-500/20 rounded-2xl hover:bg-amber-500/10 group transition-all"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="relative">
+                                            <Shield size={20} className="text-amber-500 group-hover:scale-110 transition-transform" />
+                                            {pendingUsersCount > 0 && (
+                                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full animate-ping" />
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-amber-500">Admin Menü</span>
+                                            {pendingUsersCount > 0 && (
+                                                <span className="text-[10px] uppercase tracking-wider font-black text-amber-500/60 mt-0.5">
+                                                    {pendingUsersCount} Neue Anfragen
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <ArrowRight size={18} className="text-amber-500 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+                                </Link>
+                            </div>
+                        )}
+
                         {/* Notifications Section */}
                         <div className="mb-12">
                             <label className="block text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Erinnerungen</label>
                             <PushManager vapidPublicKey={vapidPublicKey} />
+                        </div>
+
+                        {/* Account Section */}
+                        <div className="mt-auto pt-12 border-t border-border">
+                            <button
+                                onClick={() => signOut()}
+                                className="w-full flex items-center justify-between p-5 bg-rose-500/5 border border-rose-500/20 rounded-2xl hover:bg-rose-500/10 group transition-all"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <LogOut size={20} className="text-rose-500 group-hover:scale-110 transition-transform" />
+                                    <span className="font-bold text-rose-500">Abmelden</span>
+                                </div>
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -2,6 +2,7 @@ import { streamText } from 'ai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
+import { checkAndResetAiLimit, recordAiUsage } from '@/lib/ai-limits';
 
 const DEFAULT_MODEL = 'gemini-2.0-flash-lite-preview-02-05';
 
@@ -14,13 +15,22 @@ function getGoogleProvider() {
 
 export async function POST(req: Request) {
     const session = await auth();
-    if (!session) {
+    if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     try {
         const { messages, projectContext } = await req.json();
         const { title, notes, todos } = projectContext;
+
+        // Check AI Limit
+        const { canUse } = await checkAndResetAiLimit(session.user.id);
+        if (!canUse) {
+            return NextResponse.json({
+                error: 'AI Limit reached',
+                message: 'Du hast dein monatliches Token-Limit erreicht. Bitte kontaktiere einen Admin.'
+            }, { status: 429 });
+        }
 
         const googleProvider = getGoogleProvider();
 
@@ -42,6 +52,12 @@ WICHTIG:
             model: googleProvider(DEFAULT_MODEL),
             system: systemPrompt,
             messages,
+            onFinish: async (event) => {
+                if (event.usage.totalTokens > 0) {
+                    const userId = session.user!.id!;
+                    await recordAiUsage(userId, event.usage.totalTokens);
+                }
+            }
         });
 
         return result.toDataStreamResponse();

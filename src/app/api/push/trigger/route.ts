@@ -2,10 +2,17 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { webpush } from '@/lib/push';
 import { generateResurfacingMessage } from '@/lib/ai';
+import { checkAndResetAiLimit, recordAiUsage } from '@/lib/ai-limits';
+
+const FALLBACK_MESSAGES = [
+    'Lange nicht gesehen: [Projektname]',
+    'Hier schlummert noch eine Idee: [Projektname]',
+    'Lust, hier weiterzumachen? [Projektname]',
+    'Zeit für einen kurzen Blick auf: [Projektname]'
+];
 
 export async function GET(req: Request) {
     try {
-        // Basic security check via query param
         // Basic security check via query param
         const { searchParams } = new URL(req.url);
         const secret = searchParams.get('secret');
@@ -51,23 +58,50 @@ export async function GET(req: Request) {
         // Pick exactly ONE random project
         const project = candidates[Math.floor(Math.random() * candidates.length)];
 
-        // Fetch notes for the selected project to provide context to the AI
-        const projectWithNotes = await prisma.project.findUnique({
+        // Fetch notes and owner for the selected project
+        const projectWithDetails = await prisma.project.findUnique({
             where: { id: project.id },
-            include: { notes: true }
+            include: {
+                notes: true,
+                owner: true // We need the owner to heck limits
+            }
         });
 
-        const notes = projectWithNotes?.notes.map(n => n.content) || [];
+        const notes = projectWithDetails?.notes.map(n => n.content) || [];
+        let bodyText = '';
+        let usedAi = false;
 
-        // Generate AI resurfacing message
-        const aiMessage = await generateResurfacingMessage(project.name, notes);
+        // --- AI / Fallback Logic ---
+        if (projectWithDetails?.ownerId) {
+            const { canUse } = await checkAndResetAiLimit(projectWithDetails.ownerId);
+
+            if (canUse) {
+                try {
+                    const { text, tokens } = await generateResurfacingMessage(project.name, notes);
+                    bodyText = text;
+                    if (tokens > 0) {
+                        await recordAiUsage(projectWithDetails.ownerId, tokens);
+                        usedAi = true;
+                    }
+                } catch (err) {
+                    console.warn('⚠️ AI Resurfacing failed, using fallback.', err);
+                    // Fallback will be set below
+                }
+            }
+        }
+
+        // If no text generated (Limit reached or AI failed), use fallback
+        if (!bodyText) {
+            const template = FALLBACK_MESSAGES[Math.floor(Math.random() * FALLBACK_MESSAGES.length)];
+            bodyText = template.replace('[Projektname]', project.name);
+        }
 
         // Get all subscriptions
         const subscriptions = await prisma.pushSubscription.findMany();
 
         const notificationPayload = JSON.stringify({
             title: 'HubIdeas 👋',
-            body: aiMessage,
+            body: bodyText,
             url: `/project/${project.id}`
         });
 
@@ -104,7 +138,8 @@ export async function GET(req: Request) {
         return NextResponse.json({
             success: true,
             sentTo: results.filter((r) => r.status === 'fulfilled').length,
-            projectName: project.name
+            projectName: project.name,
+            aiUsed: usedAi
         });
 
     } catch (error) {

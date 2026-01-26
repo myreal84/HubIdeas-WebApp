@@ -12,7 +12,13 @@ export default async function ArchivePage() {
     if (!session) redirect("/login");
 
     const archivedProjects = await prisma.project.findMany({
-        where: { isArchived: true },
+        where: {
+            isArchived: true,
+            OR: [
+                { ownerId: session.user?.id },
+                { sharedWith: { some: { id: session.user?.id } } }
+            ]
+        },
         orderBy: { updatedAt: "desc" },
         include: {
             _count: {

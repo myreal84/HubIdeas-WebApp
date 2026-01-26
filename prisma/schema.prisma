@@ -18,8 +18,9 @@ model Project {
   todos          Todo[]
   notes          Note[]
   chatMessages   ChatMessage[]
-  owner          User?    @relation(fields: [ownerId], references: [id])
+  owner          User?    @relation("ProjectOwner", fields: [ownerId], references: [id])
   ownerId        String?
+  sharedWith     User[]   @relation("ProjectCollaborators")
 }
 
 model User {
@@ -29,10 +30,18 @@ model User {
   emailVerified DateTime?
   image         String?
   role          String    @default("USER") // "ADMIN" or "USER"
-  status        String    @default("PENDING") // "PENDING" or "APPROVED"
+  status        String    @default("WAITING") // "WAITING", "APPROVED", "REJECTED"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   accounts      Account[]
   sessions      Session[]
-  projects      Project[]
+  projects       Project[] @relation("ProjectOwner")
+  sharedProjects Project[] @relation("ProjectCollaborators")
+  createdTodos   Todo[]    @relation("TodoCreator")
+  createdNotes   Note[]    @relation("NoteCreator")
+  aiTokenLimit   Int       @default(50000)
+  aiTokensUsed   Int       @default(0)
+  lastTokenReset DateTime  @default(now())
 }
 
 model Account {
@@ -78,6 +87,8 @@ model Todo {
   updatedAt   DateTime @updatedAt
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId   String
+  creator     User?    @relation("TodoCreator", fields: [creatorId], references: [id])
+  creatorId   String?
 }
 
 model Note {
@@ -87,6 +98,8 @@ model Note {
   updatedAt   DateTime @updatedAt
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId   String
+  creator     User?    @relation("NoteCreator", fields: [creatorId], references: [id])
+  creatorId   String?
 }
 
 model ChatMessage {

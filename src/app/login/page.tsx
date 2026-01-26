@@ -57,9 +57,13 @@ export default function LoginPage() {
                             )}
                         </button>
 
-                        <p className="text-[10px] text-center text-slate-500 uppercase tracking-widest font-bold opacity-50">
+                        <p className="text-[10px] text-center text-slate-500 uppercase tracking-widest font-bold opacity-50 mb-6">
                             Sicheres Login via Google OAuth
                         </p>
+
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-xs text-slate-400">
+                            <strong>Hinweis zur Datensicherheit:</strong> Um dir intelligente Vorschläge und Chat-Funktionen zu bieten, werden deine Notizen verarbeitet. Deine Daten sind sicher gespeichert und für niemanden (auch nicht Administratoren) einsehbar, aber technisch bedingt nicht Ende-zu-Ende verschlüsselt, damit die KI damit arbeiten kann.
+                        </div>
                     </div>
                 </div>
             </div>

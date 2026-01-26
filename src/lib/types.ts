@@ -9,6 +9,12 @@ export type Project = {
     _count: {
         todos: number;
     };
+    ownerId: string | null;
+    sharedWith: {
+        id: string;
+        name: string | null;
+        image: string | null;
+    }[];
     todos: Todo[];
     notes: Note[];
     chatMessages: ChatMessage[];
@@ -28,6 +34,9 @@ export type Todo = {
     isCompleted: boolean;
     projectId: string;
     createdAt: Date;
+    creator?: {
+        name: string | null;
+    } | null;
 };
 
 export type Note = {
@@ -35,4 +44,7 @@ export type Note = {
     content: string;
     projectId: string;
     createdAt: Date;
+    creator?: {
+        name: string | null;
+    } | null;
 };

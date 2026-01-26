@@ -23,7 +23,7 @@ export async function generateSuggestedTodos(title: string, note?: string) {
     try {
         const googleProvider = getGoogleProvider();
 
-        const { object } = await generateObject({
+        const { object, usage } = await generateObject({
             model: googleProvider(DEFAULT_MODEL),
             schema: z.object({
                 suggestions: z.array(z.string()).length(3)
@@ -33,10 +33,13 @@ export async function generateSuggestedTodos(title: string, note?: string) {
                     Antworte nur mit den 3 To-Dos in einer Liste.`,
         });
 
-        return (object as { suggestions: string[] }).suggestions;
+        return {
+            suggestions: (object as { suggestions: string[] }).suggestions,
+            tokens: usage.totalTokens
+        };
     } catch (error) {
         console.error('❌ AI Suggestion Error:', error);
-        return [];
+        return { suggestions: [], tokens: 0 };
     }
 }
 
@@ -47,7 +50,7 @@ export async function generateResurfacingMessage(title: string, notes: string[])
     try {
         const googleProvider = getGoogleProvider();
 
-        const { text } = await generateText({
+        const { text, usage } = await generateText({
             model: googleProvider(DEFAULT_MODEL),
             prompt: `Projekt: "${title}"
                     ${notes.length > 0 ? `Notizen dazu: ${notes.join('; ')}` : ''}
@@ -55,10 +58,13 @@ export async function generateResurfacingMessage(title: string, notes: string[])
                     Schreibe eine sehr kurze, motivierende, einzeilige Nachricht (max. 1 Satz), die den Nutzer einlädt, an diesem Projekt weiterzumachen. Sei locker, kein Druck. Antworte NUR mit der Nachricht.`,
         });
 
-        return text.trim();
+        return {
+            text: text.trim(),
+            tokens: usage.totalTokens
+        };
     } catch (error) {
         console.error('❌ AI Resurfacing Error:', error);
-        return `Besuch mal wieder dein Projekt "${title}" - es vermisst dich.`;
+        throw error; // Let caller handle fallback
     }
 }
 /**

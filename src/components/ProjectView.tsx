@@ -14,12 +14,16 @@ import {
     MessageSquare,
     Sparkles,
     X,
-    Pencil
+    Pencil,
+    Users
 } from "lucide-react";
 import Link from "next/link";
 import { Project, Todo, Note } from "@/lib/types";
+import { motion, AnimatePresence } from "framer-motion";
 import ProjectChat from "./ProjectChat";
 import ProjectMenu from "./ProjectMenu";
+import ShareDialog from "./ShareDialog";
+import UserAvatar from "./UserAvatar";
 import {
     addTodo,
     toggleTodo,
@@ -32,13 +36,16 @@ import {
 
 type ProjectViewProps = {
     project: Project;
+    isAdmin?: boolean;
+    pendingUsersCount?: number;
 };
 
-export default function ProjectView({ project }: ProjectViewProps) {
+export default function ProjectView({ project, isAdmin, pendingUsersCount }: ProjectViewProps) {
     const [activeTab, setActiveTab] = useState<"todos" | "notes" | "chat">("todos");
     const [inputValue, setInputValue] = useState("");
     const [loading, setLoading] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
+    const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
 
     const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
@@ -87,7 +94,6 @@ export default function ProjectView({ project }: ProjectViewProps) {
         setEditContent("");
     };
 
-
     // Sort todos: active first, then completed (both by creation date)
     const sortedTodos = [...project.todos].sort((a, b) => {
         if (a.isCompleted === b.isCompleted) {
@@ -98,13 +104,13 @@ export default function ProjectView({ project }: ProjectViewProps) {
 
     return (
         <div className="main-container animate-fade-in pb-16">
-            <header className="mb-8 lg:mb-16">
+            <header className="mb-6 lg:mb-16">
                 <div className="flex items-center gap-4 lg:gap-6">
                     <Link href="/" className="group p-3 lg:p-4 bg-foreground/5 hover:bg-primary/20 rounded-2xl transition-all border border-border backdrop-blur-md shadow-xl">
-                        <ArrowLeft size={20} className="lg:w-6 lg:h-6 group-hover:-translate-x-1 transition-transform text-muted-foreground group-hover:text-primary" />
+                        <ArrowLeft size={16} className="lg:w-6 lg:h-6 group-hover:-translate-x-1 transition-transform text-muted-foreground group-hover:text-primary" />
                     </Link>
                     <div className="flex-1 min-w-0">
-                        <h1 className={`text-2xl md:text-5xl lg:text-3xl font-black title-font tracking-tight leading-tight line-clamp-2 ${project.isArchived ? 'opacity-30 line-through' : 'text-foreground'}`}>
+                        <h1 className={`text-xl md:text-5xl lg:text-3xl font-black title-font tracking-tight leading-tight line-clamp-2 ${project.isArchived ? 'opacity-30 line-through' : 'text-foreground'}`}>
                             {project.name}
                         </h1>
                         <div className="flex items-center gap-3 mt-1 lg:mt-3">
@@ -116,6 +122,28 @@ export default function ProjectView({ project }: ProjectViewProps) {
                                 <span className="flex items-center gap-2 text-primary font-bold text-[9px] lg:text-xs uppercase tracking-widest bg-primary/10 px-2 lg:px-3 py-1 lg:py-1.5 rounded-full border border-primary/20">
                                     <div className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-primary animate-pulse" /> Aktiv
                                 </span>
+                            )}
+
+                            {/* Collaborators Stack */}
+                            {project.sharedWith.length > 0 && (
+                                <div className="flex -space-x-2 ml-2">
+                                    {project.sharedWith.map((user) => (
+                                        <div key={user.id} className="w-6 h-6 rounded-full border-2 border-background overflow-hidden" title={user.name || ""}>
+                                            <UserAvatar src={user.image} name={user.name} size="sm" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Share Button (Owner only) */}
+                            {isAdmin && !project.isArchived && (
+                                <button
+                                    onClick={() => setIsShareDialogOpen(true)}
+                                    className="p-1.5 bg-foreground/5 hover:bg-primary/20 rounded-lg transition-all border border-border text-muted-foreground hover:text-primary ml-1"
+                                    title="Projekt teilen"
+                                >
+                                    <Users size={14} />
+                                </button>
                             )}
                         </div>
                     </div>
@@ -159,9 +187,11 @@ export default function ProjectView({ project }: ProjectViewProps) {
 
                 {/* Slim Inline Input for Mobile */}
                 {activeTab !== 'chat' && !project.isArchived && mounted && (
-                    <form
+                    <motion.form
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
                         onSubmit={handleSubmit}
-                        className="flex gap-2 p-1.5 bg-background/60 rounded-xl border border-border backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-300 shadow-xl"
+                        className="flex gap-2 p-1.5 bg-background/60 rounded-xl border border-border backdrop-blur-xl shadow-xl"
                     >
                         <input
                             type="text"
@@ -177,7 +207,7 @@ export default function ProjectView({ project }: ProjectViewProps) {
                         >
                             {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={20} strokeWidth={3} />}
                         </button>
-                    </form>
+                    </motion.form>
                 )}
             </div>
 
@@ -194,7 +224,8 @@ export default function ProjectView({ project }: ProjectViewProps) {
                     </div>
 
                     {/* Desktop Inline Task Input */}
-                    <form
+                    <motion.form
+                        layout
                         onSubmit={(e) => {
                             e.preventDefault();
                             if (inputValue.trim()) {
@@ -202,7 +233,7 @@ export default function ProjectView({ project }: ProjectViewProps) {
                                 setInputValue("");
                             }
                         }}
-                        className="hidden lg:flex gap-4 p-2 bg-background/60 rounded-3xl border border-border overflow-hidden focus-within:border-primary/50 transition-all mb-8"
+                        className="hidden lg:flex gap-4 p-2 bg-background/60 rounded-3xl border border-border overflow-hidden focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10 transition-all mb-8 shadow-2xl"
                     >
                         <input
                             type="text"
@@ -211,77 +242,97 @@ export default function ProjectView({ project }: ProjectViewProps) {
                             placeholder="Neue Aufgabe..."
                             className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-foreground text-lg font-bold placeholder:text-muted-foreground/30"
                         />
-                        <button type="submit" className="bg-primary hover:brightness-110 text-white p-4 rounded-2xl transition-all shadow-lg shadow-indigo-500/20">
+                        <button type="submit" className="bg-primary hover:brightness-110 text-white p-4 rounded-2xl transition-all shadow-lg">
                             <Plus size={24} strokeWidth={3} />
                         </button>
-                    </form>
+                    </motion.form>
 
-                    <div className="space-y-2 lg:space-y-4">
-                        {project.todos.length === 0 && (
-                            <div className="text-center py-16 lg:py-24 bg-foreground/5 rounded-[2rem] border-2 border-dashed border-border group">
-                                <CheckSquare className="w-10 h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground/20 mb-4 group-hover:text-muted-foreground/30 transition-colors" />
-                                <p className="text-muted-foreground font-bold text-sm lg:text-lg tracking-tight">Alles erledigt.</p>
-                            </div>
-                        )}
-                        {sortedTodos.map((todo: Todo) => (
-                            <div
-                                key={todo.id}
-                                className={`group flex items-center gap-4 p-4 lg:p-6 bg-foreground/5 border border-border rounded-2xl lg:rounded-3xl transition-all hover:bg-foreground/10 hover:border-primary/30 relative min-h-[64px] lg:min-h-[80px] ${todo.isCompleted ? 'opacity-40 grayscale-[0.5]' : ''}`}
-                            >
-                                <button
-                                    onClick={() => toggleTodo(todo.id, !todo.isCompleted)}
-                                    className={`relative z-10 transition-all hover:scale-110 active:scale-95 ${todo.isCompleted ? 'text-green-500' : 'text-slate-700 hover:text-primary'}`}
+                    <motion.div className="space-y-2 lg:space-y-4" layout>
+                        <AnimatePresence mode="popLayout">
+                            {project.todos.length === 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="text-center py-16 lg:py-24 bg-foreground/5 rounded-[2rem] border-2 border-dashed border-border group"
                                 >
-                                    {todo.isCompleted ? <CheckCircle2 className="w-6 h-6 lg:w-8 lg:h-8" strokeWidth={2.5} /> : <Circle className="w-6 h-6 lg:w-8 lg:h-8" strokeWidth={2.5} />}
-                                </button>
+                                    <CheckSquare className="w-10 h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground/20 mb-4 group-hover:text-muted-foreground/30 transition-colors" />
+                                    <p className="text-muted-foreground font-bold text-sm lg:text-lg tracking-tight">Alles erledigt.</p>
+                                </motion.div>
+                            )}
+                            {sortedTodos.map((todo: Todo) => (
+                                <motion.div
+                                    key={todo.id}
+                                    layout
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: 20 }}
+                                    className={`group flex items-center gap-4 p-4 lg:p-6 bg-card border border-border rounded-2xl lg:rounded-3xl transition-all hover:bg-card/80 hover:border-primary/30 relative min-h-[64px] lg:min-h-[80px] shadow-sm hover:shadow-xl ${todo.isCompleted ? 'opacity-40 grayscale-[0.5]' : ''}`}
+                                >
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await toggleTodo(todo.id, !todo.isCompleted);
+                                            } catch (error) {
+                                                console.error("Toggle failed:", error);
+                                            }
+                                        }}
+                                        className={`relative z-10 transition-all hover:scale-110 active:scale-95 ${todo.isCompleted ? 'text-green-500' : 'text-slate-400 hover:text-primary'}`}
+                                    >
+                                        {todo.isCompleted ? <CheckCircle2 className="w-6 h-6 lg:w-8 lg:h-8" strokeWidth={2.5} /> : <Circle className="w-6 h-6 lg:w-8 lg:h-8" strokeWidth={2.5} />}
+                                    </button>
 
-                                {editingTodoId === todo.id ? (
-                                    <div className="flex-1 flex flex-col gap-3">
-                                        <textarea
-                                            autoFocus
-                                            value={editContent}
-                                            onChange={(e) => setEditContent(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Escape') setEditingTodoId(null);
-                                            }}
-                                            className="w-full bg-foreground/5 border border-border rounded-xl p-4 text-foreground font-bold outline-none focus:border-primary min-h-[80px] resize-none"
-                                        />
-                                        <div className="flex justify-end gap-2">
-                                            <button onClick={() => setEditingTodoId(null)} className="px-4 py-2 rounded-xl text-muted-foreground hover:text-foreground transition-colors font-bold uppercase text-[10px] tracking-widest">
-                                                Abbrechen
-                                            </button>
-                                            <button onClick={() => handleSaveTodo(todo.id)} className="px-4 py-2 bg-primary rounded-xl text-white hover:brightness-110 transition-all font-bold uppercase text-[10px] tracking-widest">
-                                                Speichern
-                                            </button>
+                                    {editingTodoId === todo.id ? (
+                                        <div className="flex-1 flex flex-col gap-3">
+                                            <textarea
+                                                autoFocus
+                                                value={editContent}
+                                                onChange={(e) => setEditContent(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Escape') setEditingTodoId(null);
+                                                }}
+                                                className="w-full bg-foreground/5 border border-border rounded-xl p-4 text-foreground font-bold outline-none focus:border-primary min-h-[80px] resize-none"
+                                            />
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={() => setEditingTodoId(null)} className="px-4 py-2 rounded-xl text-muted-foreground hover:text-foreground transition-colors font-bold uppercase text-[10px] tracking-widest">
+                                                    Abbrechen
+                                                </button>
+                                                <button onClick={() => handleSaveTodo(todo.id)} className="px-4 py-2 bg-primary rounded-xl text-white hover:brightness-110 transition-all font-bold uppercase text-[10px] tracking-widest">
+                                                    Speichern
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <span className={`relative z-10 flex-1 font-bold text-base lg:text-2xl transition-all ${todo.isCompleted ? 'line-through opacity-50 italic' : 'text-foreground'}`}>
-                                            {todo.content}
-                                        </span>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => handleEditTodo(todo)}
-                                                className="relative z-10 btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-muted-foreground hover:text-primary"
-                                            >
-                                                <Pencil className="w-4 h-4 lg:w-5 lg:h-5" />
-                                            </button>
-                                            <button
-                                                onClick={() => deleteTodo(todo.id)}
-                                                className="relative z-10 btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-muted-foreground hover:text-red-400"
-                                            >
-                                                <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        ))}
-                        {/* Mobile Spacer */}
-                        <div className="lg:hidden h-16" />
-                    </div>
-
+                                    ) : (
+                                        <>
+                                            <div className="flex flex-col flex-1">
+                                                <span className={`relative z-10 font-bold text-base lg:text-2xl transition-all ${todo.isCompleted ? 'line-through opacity-50 italic' : 'text-foreground'}`}>
+                                                    {todo.content}
+                                                </span>
+                                                {todo.creator?.name && (
+                                                    <span className="text-[10px] italic opacity-40 font-medium">von {todo.creator.name}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => handleEditTodo(todo)}
+                                                    className="relative z-10 btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-muted-foreground hover:text-primary"
+                                                >
+                                                    <Pencil className="w-4 h-4 lg:w-5 lg:h-5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteTodo(todo.id)}
+                                                    className="relative z-10 btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-muted-foreground hover:text-red-400"
+                                                >
+                                                    <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </motion.div>
+                    {/* Mobile Spacer */}
+                    <div className="lg:hidden h-16" />
                 </div>
 
                 {/* Notes Section */}
@@ -313,73 +364,87 @@ export default function ProjectView({ project }: ProjectViewProps) {
                             placeholder="Gedanken festhalten..."
                             className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-foreground text-lg font-bold placeholder:text-muted-foreground/30"
                         />
-                        <button type="submit" className="bg-accent hover:brightness-110 text-white p-4 rounded-2xl transition-all shadow-lg shadow-purple-500/20">
+                        <button type="submit" className="bg-accent hover:brightness-110 text-white p-4 rounded-2xl transition-all shadow-lg">
                             <Plus size={24} strokeWidth={3} />
                         </button>
                     </form>
 
-                    <div className="grid grid-cols-1 gap-4">
-                        {project.notes.length === 0 && (
-                            <div className="text-center py-16 lg:py-24 bg-foreground/5 rounded-[2rem] border-2 border-dashed border-border group">
-                                <StickyNote className="w-10 h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground/20 mb-4 group-hover:text-muted-foreground/30 transition-colors" />
-                                <p className="text-muted-foreground font-bold text-sm lg:text-lg tracking-tight">Deine Ideen.</p>
-                            </div>
-                        )}
-                        {project.notes.map((note: Note) => (
-                            <div
-                                key={note.id}
-                                className="group relative p-4 lg:p-8 bg-foreground/5 border border-border rounded-2xl lg:rounded-3xl hover:bg-foreground/10 transition-all min-h-[80px] lg:min-h-[120px]"
-                            >
-                                <div className="flex justify-between items-start gap-4 lg:gap-6 mb-4 lg:mb-6">
-                                    {editingNoteId === note.id ? (
-                                        <div className="flex-1 flex flex-col gap-3">
-                                            <textarea
-                                                autoFocus
-                                                value={editContent}
-                                                onChange={(e) => setEditContent(e.target.value)}
-                                                className="w-full bg-foreground/5 border border-border rounded-xl p-4 text-foreground font-bold outline-none focus:border-accent min-h-[100px] resize-none"
-                                            />
-                                            <div className="flex justify-end gap-2">
-                                                <button onClick={() => setEditingNoteId(null)} className="px-4 py-2 rounded-xl text-muted-foreground hover:text-foreground transition-colors font-bold uppercase text-[10px] tracking-widest">
-                                                    Abbrechen
-                                                </button>
-                                                <button onClick={() => handleSaveNote(note.id)} className="px-4 py-2 bg-accent rounded-xl text-white hover:brightness-110 transition-all font-bold uppercase text-[10px] tracking-widest">
-                                                    Speichern
-                                                </button>
+                    <motion.div className="grid grid-cols-1 gap-4" layout>
+                        <AnimatePresence mode="popLayout">
+                            {project.notes.length === 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="text-center py-16 lg:py-24 bg-foreground/5 rounded-[2rem] border-2 border-dashed border-border group"
+                                >
+                                    <StickyNote className="w-10 h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground/20 mb-4 group-hover:text-muted-foreground/30 transition-colors" />
+                                    <p className="text-muted-foreground font-bold text-sm lg:text-lg tracking-tight">Deine Ideen.</p>
+                                </motion.div>
+                            )}
+                            {project.notes.map((note: Note) => (
+                                <motion.div
+                                    key={note.id}
+                                    layout
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    className="group relative p-4 lg:p-8 bg-card border border-border rounded-2xl lg:rounded-3xl hover:bg-card/80 transition-all min-h-[80px] lg:min-h-[120px] shadow-sm hover:shadow-xl"
+                                >
+                                    <div className="flex justify-between items-start gap-4 lg:gap-6 mb-4 lg:mb-6">
+                                        {editingNoteId === note.id ? (
+                                            <div className="flex-1 flex flex-col gap-3">
+                                                <textarea
+                                                    autoFocus
+                                                    value={editContent}
+                                                    onChange={(e) => setEditContent(e.target.value)}
+                                                    className="w-full bg-foreground/5 border border-border rounded-xl p-4 text-foreground font-bold outline-none focus:border-accent min-h-[100px] resize-none"
+                                                />
+                                                <div className="flex justify-end gap-2">
+                                                    <button onClick={() => setEditingNoteId(null)} className="px-4 py-2 rounded-xl text-muted-foreground hover:text-foreground transition-colors font-bold uppercase text-[10px] tracking-widest">
+                                                        Abbrechen
+                                                    </button>
+                                                    <button onClick={() => handleSaveNote(note.id)} className="px-4 py-2 bg-accent rounded-xl text-white hover:brightness-110 transition-all font-bold uppercase text-[10px] tracking-widest">
+                                                        Speichern
+                                                    </button>
+                                                </div>
                                             </div>
+                                        ) : (
+                                            <>
+                                                <p className="flex-1 text-foreground text-base lg:text-2xl font-bold leading-snug whitespace-pre-wrap">{note.content}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleEditNote(note)}
+                                                        className="btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 text-muted-foreground hover:text-accent transition-all"
+                                                    >
+                                                        <Pencil className="w-4 h-4 lg:w-5 lg:h-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => deleteNote(note.id)}
+                                                        className="btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all"
+                                                    >
+                                                        <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-3 lg:gap-4 opacity-30">
+                                        <div className="h-px flex-1 bg-border" />
+                                        <div className="flex flex-col items-end">
+                                            <time className="text-[9px] lg:text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                                                {new Date(note.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
+                                            </time>
+                                            {note.creator?.name && (
+                                                <span className="text-[9px] italic font-medium">von {note.creator.name}</span>
+                                            )}
                                         </div>
-                                    ) : (
-                                        <>
-                                            <p className="flex-1 text-foreground text-base lg:text-2xl font-bold leading-snug whitespace-pre-wrap">{note.content}</p>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => handleEditNote(note)}
-                                                    className="btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 text-muted-foreground hover:text-accent transition-all"
-                                                >
-                                                    <Pencil className="w-4 h-4 lg:w-5 lg:h-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => deleteNote(note.id)}
-                                                    className="btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all"
-                                                >
-                                                    <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
-                                                </button>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-3 lg:gap-4 opacity-30">
-                                    <div className="h-px flex-1 bg-border" />
-                                    <time className="text-[9px] lg:text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                                        {new Date(note.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
-                                    </time>
-                                </div>
-                            </div>
-                        ))}
-                        {/* Mobile Spacer */}
-                        <div className="lg:hidden h-16" />
-                    </div>
-
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </motion.div>
+                    {/* Mobile Spacer */}
+                    <div className="lg:hidden h-16" />
                 </div>
 
                 {/* Mobile-only Chat Section (Hidden on Desktop because of Overlay) */}
@@ -393,7 +458,6 @@ export default function ProjectView({ project }: ProjectViewProps) {
                     <ProjectChat project={project} />
                 </div>
             </div>
-
 
             {/* AI Chat Overlay for Desktop */}
             {isChatOpen && mounted && createPortal(
@@ -427,13 +491,22 @@ export default function ProjectView({ project }: ProjectViewProps) {
                 document.body
             )}
 
+            <ShareDialog
+                projectId={project.id}
+                ownerId={project.ownerId}
+                currentCollaborators={project.sharedWith}
+                isOpen={isShareDialogOpen}
+                onClose={() => setIsShareDialogOpen(false)}
+            />
+
             <ProjectMenu
                 projectId={project.id}
                 projectName={project.name}
                 isArchived={project.isArchived}
                 onOpenChat={() => setIsChatOpen(true)}
+                isAdmin={isAdmin}
+                pendingUsersCount={pendingUsersCount}
             />
         </div>
     );
 }
-

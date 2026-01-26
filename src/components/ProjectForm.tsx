@@ -5,13 +5,14 @@ import { createPortal } from "react-dom";
 import { createProject, addTodo } from "@/lib/actions";
 import { Plus, Sparkles, X, Check, Loader2 } from "lucide-react";
 
-export default function ProjectForm() {
+export default function ProjectForm({ onProjectCreated }: { onProjectCreated?: () => void }) {
     const [name, setName] = useState("");
     const [note, setNote] = useState("");
     const [loading, setLoading] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [suggesting, setSuggesting] = useState(false);
+    const [useAI, setUseAI] = useState(true);
     const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
     const [addedIndices, setAddedIndices] = useState<Set<number>>(new Set());
     const [mounted, setMounted] = useState(false);
@@ -28,21 +29,24 @@ export default function ProjectForm() {
         try {
             const project = await createProject(name, note);
             setCreatedProjectId(project.id);
+            if (onProjectCreated) onProjectCreated();
             setLoading(false);
 
-            // Start AI suggestion process
-            setSuggesting(true);
-            setShowSuggestions(true);
+            if (useAI) {
+                // Start AI suggestion process
+                setSuggesting(true);
+                setShowSuggestions(true);
 
-            const res = await fetch('/api/ai/suggest-todos', {
-                method: 'POST',
-                body: JSON.stringify({ title: name, note: note }),
-                headers: { 'Content-Type': 'application/json' }
-            });
+                const res = await fetch('/api/ai/suggest-todos', {
+                    method: 'POST',
+                    body: JSON.stringify({ title: name, note: note }),
+                    headers: { 'Content-Type': 'application/json' }
+                });
 
-            const data = await res.json();
-            if (data.suggestions) {
-                setSuggestions(data.suggestions);
+                const data = await res.json();
+                if (data.suggestions) {
+                    setSuggestions(data.suggestions);
+                }
             }
         } catch (error) {
             console.error(error);
@@ -104,6 +108,22 @@ export default function ProjectForm() {
                         />
                     </div>
                 )}
+
+                <div className="flex items-center gap-3 px-1 animate-fade-in" style={{ animationDelay: '200ms' }}>
+                    <button
+                        type="button"
+                        onClick={() => setUseAI(!useAI)}
+                        className={`group flex items-center gap-3 px-4 py-2 rounded-xl border transition-all ${useAI ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-foreground/5 border-border text-muted-foreground'}`}
+                    >
+                        <div className={`p-1 rounded-lg transition-colors ${useAI ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-foreground/10 text-muted-foreground'}`}>
+                            {useAI ? <Sparkles size={14} strokeWidth={2.5} /> : <X size={14} strokeWidth={2.5} />}
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest">KI-Vorschläge {useAI ? 'aktiv' : 'aus'}</span>
+                    </button>
+                    <p className="text-[9px] text-muted-foreground/40 font-medium leading-none max-w-[200px]">
+                        Lass dir automatisch erste Aufgaben für dein Projekt vorschlagen.
+                    </p>
+                </div>
             </form>
 
             {/* AI Suggestions Popup - Portal to body to fix stacking context */}
