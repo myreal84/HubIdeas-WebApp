@@ -1,39 +1,33 @@
 import NextAuth from "next-auth";
-import Credentials from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { prisma } from "@/lib/prisma";
+import { authConfig, normalizeEmail } from "./auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-    providers: [
-        Credentials({
-            name: "Password",
-            credentials: {
-                password: { label: "Password", type: "password" },
-            },
-            async authorize(credentials) {
-                const rawAdminPassword = process.env.ADMIN_PASSWORD;
-                if (!rawAdminPassword) return null;
+    ...authConfig,
+    adapter: PrismaAdapter(prisma),
+    session: { strategy: "jwt" },
+    events: {
+        async signIn({ user }) {
+            const userEmail = normalizeEmail(user.email);
+            const adminEmail = normalizeEmail(process.env.INITIAL_ADMIN_EMAIL);
 
-                // Remove potential surrounding quotes and whitespace from the environment variable
-                const adminPassword = rawAdminPassword.replace(/^["']|["']$/g, '').trim();
+            console.log(`[Auth-Server] SignIn Event: ${user.email} (normalized: ${userEmail})`);
+            console.log(`[Auth-Server] Admin Config: ${process.env.INITIAL_ADMIN_EMAIL} (normalized: ${adminEmail})`);
 
-                if (credentials && credentials.password === adminPassword) {
-                    return { id: "1", name: "Admin" };
-                }
-                return null;
-            },
-        }),
-    ],
-    pages: {
-        signIn: "/login",
-    },
-    callbacks: {
-        authorized({ auth, request: { nextUrl } }) {
-            const isLoggedIn = !!auth?.user;
-            const isOnLogin = nextUrl.pathname.startsWith("/login");
-            if (isOnLogin) {
-                if (isLoggedIn) return Response.redirect(new URL("/", nextUrl));
-                return true;
+            if (userEmail && adminEmail && userEmail === adminEmail) {
+                console.log(`[Auth-Server] Match found! Promoting ${user.email} to ADMIN/APPROVED`);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (prisma as any).user.update({
+                    where: { email: user.email },
+                    data: {
+                        role: "ADMIN",
+                        status: "APPROVED",
+                    },
+                });
+            } else {
+                console.log(`[Auth-Server] No match found.`);
             }
-            return isLoggedIn;
         },
     },
 });
