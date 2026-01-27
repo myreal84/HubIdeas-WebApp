@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { messages, projectContext } = await req.json();
+        const { messages, projectContext, mode, referencedContext } = await req.json();
         const { title, notes, todos } = projectContext;
 
         // Check AI Limit
@@ -34,19 +34,45 @@ export async function POST(req: Request) {
 
         const googleProvider = getGoogleProvider();
 
-        const systemPrompt = `Du bist ein hilfreicher KI-Assistent für das Projekt "${title}".
-Hilf dem Nutzer, Ideen zu entwickeln, To-Dos zu formulieren oder Fragen zum Projekt zu beantworten.
+        let systemPrompt = '';
+
+        if (mode === 'todo') {
+            systemPrompt = `Du bist ein spezialisierter Aufgaben-Planer für das Projekt "${title}".
+Deine Aufgabe ist es, basierend auf der Nutzeranfrage und dem Kontext konkret umsetzbare To-Dos zu generieren.
+
+KONTEXT DES PROJEKTS:
+Titel: ${title}
+${notes.length > 0 ? `Notizen:\n- ${notes.join('\n- ')}` : 'Keine Notizen vorhanden.'}
+${todos.length > 0 ? `Bestehende Aufgaben:\n- ${todos.map((t: { content: string }) => t.content).join('\n- ')}` : 'Keine Aufgaben vorhanden.'}
+
+${referencedContext && referencedContext.length > 0 ? `SPEZIELLER KONTEXT (Vom Nutzer ausgewählt):\n${referencedContext.map((item: { type: string, title: string, content: string }) => `${item.type.toUpperCase()}: ${item.title}\nInhalt: ${item.content}`).join('\n\n')}` : ''}
+
+REGELN FÜR TO-DO GENERATION:
+1. Antworte mit einer SEHR KURZEN Einleitung (maximal 2 Sätze).
+2. Die Aufgaben selbst müssen AUSSCHLIESSLICH im JSON-Array stehen.
+3. **WICHTIG**: Erstelle KEINE Listen im Markdown-Format (z.B. mit Aufzählungspunkten oder Nummern) im Textteil.
+4. Beispiel für das JSON-Array: ["Aufgabe 1", "Aufgabe 2"]
+5. Formuliere die Aufgaben kurz, präzise und aktionsorientiert.
+6. Antworte am Ende NUR noch mit dem JSON-Array, kein Text danach.`;
+        } else {
+            systemPrompt = `Du bist ein erfahrener Sparringspartner und Kollege für das Projekt "${title}".
+Deine Rolle ist es, Ideen zu reflektieren, Impulse zu geben und dem Nutzer zu helfen, sein Projekt voranzubringen.
 
 KONTEXT DES PROJEKTS:
 Titel: ${title}
 ${notes.length > 0 ? `Notizen:\n- ${notes.join('\n- ')}` : 'Keine Notizen vorhanden.'}
 ${todos.length > 0 ? `Offene Aufgaben:\n- ${todos.filter((t: { isCompleted: boolean }) => !t.isCompleted).map((t: { content: string }) => t.content).join('\n- ')}` : 'Keine offenen Aufgaben.'}
 
-WICHTIG:
-- Sei präzise und motivierend.
-- Wenn du Aufgaben vorschlägst, verwende Bulletpoints (z.B. "- Aufgabe 1"). Das System erkennt diese und bietet dem Nutzer an, sie direkt zu speichern.
-- Antworte auf Deutsch.
-- Halte die Antworten kompakt und fokussiert auf das Projekt.`;
+${referencedContext && referencedContext.length > 0 ? `ZUSÄTZLICHER KONTEXT (Beziehe dich primär darauf):\n${referencedContext.map((item: { type: string, title: string, content: string }) => `${item.type.toUpperCase()}: ${item.title}\nInhalt: ${item.content}`).join('\n\n')}` : ''}
+
+WICHTIG FÜR DEN DIALOG:
+- Antworte wie in einer guten Unterhaltung: Kompetent, direkt und ohne unnötige Floskeln.
+- Nutze Markdown (Fettdruck, Listen) sinnvoll, um deine Antworten zu strukturieren.
+- **WICHTIG**: Sende NIEMALS eine Antwort, die nur aus einem JSON-Array (z.B. ["Aufgabe 1", ...]) besteht. Nutze stattdessen normale Markdown-Aufzählungszeichen.
+- Vermeide rein dekorative Sonderzeichen-Ketten. Nutze Formatierung nur dort, wo sie dem Verständnis dient.
+- Sei konstruktiv-kritisch, wenn nötig, und bringe eigene Ideen ein.
+- Antworte auf Deutsch und halte dich kompakt.`;
+        }
 
         const result = await streamText({
             model: googleProvider(DEFAULT_MODEL),

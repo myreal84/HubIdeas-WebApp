@@ -24,6 +24,7 @@ export type ChatMessage = {
     id: string;
     role: 'user' | 'assistant';
     content: string;
+    mode?: 'conversation' | 'todo' | null;
     projectId: string;
     createdAt: Date;
 };

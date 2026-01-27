@@ -16,6 +16,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     const isAdmin = (session.user as any)?.role === "ADMIN";
     const pendingUsersCount = isAdmin ? await getPendingUsersCount() : 0;
 
+    // Fetch fresh user data for token limits
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const user = await (prisma.user as any).findUnique({
+        where: { id: session.user?.id },
+        select: { aiTokensUsed: true, aiTokenLimit: true }
+    });
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const project = await (prisma.project as any).findFirst({
         where: {
@@ -58,6 +65,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             project={project as unknown as Project}
             isAdmin={isAdmin}
             pendingUsersCount={pendingUsersCount}
+            aiTokensUsed={user?.aiTokensUsed || 0}
+            aiTokenLimit={user?.aiTokenLimit || 2000}
         />
     );
 }

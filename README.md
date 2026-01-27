@@ -12,14 +12,18 @@ HubIdeas ist eine minimalistische, lokale Web-App zur Organisation von Projekten
 - **Project Sharing**: Teile Projekte mit anderen Nutzern und arbeite gemeinsam an Ideen. Die Urheber von Inhalten werden dabei transparent angezeigt.
 
 ### 🤖 Smart AI Features (powered by Google Gemini)
-- **Auto-Suggestions**: Erhalte beim Erstellen eines Projekts sofrott 3 konkrete Handlungsschritte – optional deaktivierbar.
-- **Kontext-Chat**: Diskutiere deine Ideen mit einem KI-Assistenten, der den vollen Kontext deiner Notizen kennt.
+- **Dual-Mode Chat**:
+    - **Unterhaltung**: Diskutiere deine Projekte im freien Dialog.
+    - **To-Do Generation**: Lass dir vom Assistenten konkrete, strukturierte Aufgabenlisten erstellen, die du direkt übernehmen kannst.
+- **Auto-Suggestions**: Erhalte beim Erstellen eines Projekts sofort 3 konkrete Handlungsschritte – optional deaktivierbar.
 - **Resilient Resurfacing**: Intelligente Push-Erinnerungen für vergessene Projekte.
-    - *Smart Fallback*: Wenn das AI-Limit erreicht ist, motiviert das System mit charmanten Standard-Texten.
-- **Fair Use Limits**: Monatliche Token-Kontingente pro Nutzer sorgen für Kostenkontrolle.
+- **Transparent Limits**:
+    - **Live-Token-Tracking**: Sehe jederzeit deinen aktuellen Verbrauch im Chat.
+    - **Smart Blocking**: Automatische Eingabesperre bei Erreichen des Monatlimits zur Kostenkontrolle.
 
 ### 🎨 Design & UX
 - **Premium UI**: Modernes Interface mit Glassmorphism, Framer Motion Animationen und "Blobby"-Inputs.
+- **Clean Chat**: Kein Duplizieren von Nachrichten, stabile Ansichten auch bei Modus-Wechseln.
 - **Adaptive Themes**: Wähle zwischen einem eleganten Dark-Mode ("Slate & Purple") und einem frischen Light-Mode.
 
 ### 🛡️ Administration & Sicherheit
@@ -31,7 +35,7 @@ HubIdeas ist eine minimalistische, lokale Web-App zur Organisation von Projekten
 ## Tech Stack
 
 - **Framework**: [Next.js 15+](https://nextjs.org) (App Router)
-- **UI**: Tailwind CSS, Framer Motion
+- **UI**: Tailwind CSS, Framer Motion, Lucide Icons
 - **Datenbank**: SQLite mit [Prisma](https://prisma.io)
 - **Auth**: [Auth.js (NextAuth)](https://authjs.dev)
 - **AI**: [Google AI SDK](https://ai.google.dev/)
@@ -74,5 +78,9 @@ Besuche [http://localhost:3000](http://localhost:3000) im Browser.
 
 ## Deployment
 
-Das Projekt enthält ein `start.sh`-Skript und ist für den Betrieb in einem Docker-Container oder direkt auf einem Linux-Server optimiert.
-Bei Updates einfach `git pull` und `./start.sh` (wenn vorhanden) oder `npm run build` ausführen.
+Das Projekt enthält ein `Dockerfile` und ist für den Betrieb via Docker Compose optimiert.
+Bei Updates einfach:
+```bash
+git pull
+docker compose up -d --build
+```

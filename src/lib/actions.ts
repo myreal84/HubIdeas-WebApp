@@ -307,12 +307,12 @@ export async function updateNote(id: string, content: string) {
 
 // --- Chat Actions ---
 
-export async function saveChatMessage(projectId: string, role: string, content: string) {
+export async function saveChatMessage(projectId: string, role: string, content: string, mode?: string) {
     const userId = await getRequiredUserId();
     await checkProjectAccess(projectId, userId);
 
     await prisma.chatMessage.create({
-        data: { projectId, role, content },
+        data: { projectId, role, content, mode },
     });
     revalidatePath(`/project/${projectId}`);
 }

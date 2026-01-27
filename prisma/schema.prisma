@@ -106,6 +106,7 @@ model ChatMessage {
   id        String   @id @default(cuid())
   role      String   // 'user' or 'assistant'
   content   String
+  mode      String?  // 'conversation' or 'todo'
   createdAt DateTime @default(now())
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId String

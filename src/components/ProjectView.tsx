@@ -38,11 +38,14 @@ type ProjectViewProps = {
     project: Project;
     isAdmin?: boolean;
     pendingUsersCount?: number;
+    aiTokensUsed?: number;
+    aiTokenLimit?: number;
 };
 
-export default function ProjectView({ project, isAdmin, pendingUsersCount }: ProjectViewProps) {
+export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTokensUsed, aiTokenLimit }: ProjectViewProps) {
     const [activeTab, setActiveTab] = useState<"todos" | "notes" | "chat">("todos");
-    const [inputValue, setInputValue] = useState("");
+    const [todoInputValue, setTodoInputValue] = useState("");
+    const [noteInputValue, setNoteInputValue] = useState("");
     const [loading, setLoading] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
@@ -58,15 +61,17 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount }: Pro
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!inputValue.trim() || loading) return;
+        const currentInput = activeTab === "todos" ? todoInputValue : noteInputValue;
+        if (!currentInput.trim() || loading) return;
 
         setLoading(true);
         if (activeTab === "todos") {
-            await addTodo(project.id, inputValue);
+            await addTodo(project.id, todoInputValue);
+            setTodoInputValue("");
         } else {
-            await addNote(project.id, inputValue);
+            await addNote(project.id, noteInputValue);
+            setNoteInputValue("");
         }
-        setInputValue("");
         setLoading(false);
     };
 
@@ -195,14 +200,14 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount }: Pro
                     >
                         <input
                             type="text"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
+                            value={activeTab === "todos" ? todoInputValue : noteInputValue}
+                            onChange={(e) => activeTab === "todos" ? setTodoInputValue(e.target.value) : setNoteInputValue(e.target.value)}
                             placeholder={activeTab === "todos" ? "Aufgabe hinzufügen..." : "Gedanke festhalten..."}
                             className="flex-1 bg-transparent border-none outline-none px-4 py-2 text-sm font-bold placeholder:text-muted-foreground/30 text-foreground"
                         />
                         <button
                             type="submit"
-                            disabled={loading || !inputValue.trim()}
+                            disabled={loading || !(activeTab === "todos" ? todoInputValue : noteInputValue).trim()}
                             className="p-2 aspect-square rounded-lg bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center transition-all active:scale-95 disabled:opacity-30 flex-shrink-0"
                         >
                             {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={20} strokeWidth={3} />}
@@ -228,17 +233,17 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount }: Pro
                         layout
                         onSubmit={(e) => {
                             e.preventDefault();
-                            if (inputValue.trim()) {
-                                addTodo(project.id, inputValue);
-                                setInputValue("");
+                            if (todoInputValue.trim()) {
+                                addTodo(project.id, todoInputValue);
+                                setTodoInputValue("");
                             }
                         }}
                         className="hidden lg:flex gap-4 p-2 bg-background/60 rounded-3xl border border-border overflow-hidden focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10 transition-all mb-8 shadow-2xl"
                     >
                         <input
                             type="text"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
+                            value={todoInputValue}
+                            onChange={(e) => setTodoInputValue(e.target.value)}
                             placeholder="Neue Aufgabe..."
                             className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-foreground text-lg font-bold placeholder:text-muted-foreground/30"
                         />
@@ -350,17 +355,17 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount }: Pro
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
-                            if (inputValue.trim()) {
-                                addNote(project.id, inputValue);
-                                setInputValue("");
+                            if (noteInputValue.trim()) {
+                                addNote(project.id, noteInputValue);
+                                setNoteInputValue("");
                             }
                         }}
                         className="hidden lg:flex gap-4 p-2 bg-background/60 rounded-3xl border border-border overflow-hidden focus-within:border-accent/50 transition-all mb-8"
                     >
                         <input
                             type="text"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
+                            value={noteInputValue}
+                            onChange={(e) => setNoteInputValue(e.target.value)}
                             placeholder="Gedanken festhalten..."
                             className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-foreground text-lg font-bold placeholder:text-muted-foreground/30"
                         />
@@ -455,7 +460,7 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount }: Pro
                             KI-Powered
                         </span>
                     </div>
-                    <ProjectChat project={project} />
+                    <ProjectChat project={project} aiTokensUsed={aiTokensUsed} aiTokenLimit={aiTokenLimit} />
                 </div>
             </div>
 
@@ -484,7 +489,7 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount }: Pro
 
                         {/* Chat Window */}
                         <div className="flex-1 overflow-hidden">
-                            <ProjectChat project={project} />
+                            <ProjectChat project={project} aiTokensUsed={aiTokensUsed} aiTokenLimit={aiTokenLimit} />
                         </div>
                     </div>
                 </div>,
