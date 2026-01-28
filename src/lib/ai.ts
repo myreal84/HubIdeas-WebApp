@@ -7,7 +7,7 @@ import { z } from 'zod';
  * This service handles communication with the LLM (Gemini by default).
  */
 
-const DEFAULT_MODEL = 'gemini-2.0-flash-lite-preview-02-05';
+const DEFAULT_MODEL = 'gemini-2.0-flash-lite';
 
 function getGoogleProvider() {
     const rawApiKey = process.env.GOOGLE_GENERATION_AI_API_KEY;

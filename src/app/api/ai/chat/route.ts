@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
 import { checkAndResetAiLimit, recordAiUsage } from '@/lib/ai-limits';
 
-const DEFAULT_MODEL = 'gemini-2.0-flash-lite-preview-02-05';
+const DEFAULT_MODEL = 'gemini-2.0-flash-lite';
 
 function getGoogleProvider() {
     const rawApiKey = process.env.GOOGLE_GENERATION_AI_API_KEY;
