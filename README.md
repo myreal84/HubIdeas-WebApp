@@ -34,11 +34,11 @@ HubIdeas ist eine minimalistische, lokale Web-App zur Organisation von Projekten
 
 ## Tech Stack
 
-- **Framework**: [Next.js 15+](https://nextjs.org) (App Router)
+- **Framework**: [Next.js 16+](https://nextjs.org) (App Router)
 - **UI**: Tailwind CSS, Framer Motion, Lucide Icons
 - **Datenbank**: SQLite mit [Prisma](https://prisma.io)
 - **Auth**: [Auth.js (NextAuth)](https://authjs.dev)
-- **AI**: [Google AI SDK](https://ai.google.dev/)
+- **AI**: [Google Gemini 2.0 Flash Lite](https://ai.google.dev/)
 - **Notifications**: Web Push Protocol
 
 ## Installation & Setup
@@ -78,9 +78,11 @@ Besuche [http://localhost:3000](http://localhost:3000) im Browser.
 
 ## Deployment
 
-Das Projekt enthält ein `Dockerfile` und ist für den Betrieb via Docker Compose optimiert.
-Bei Updates einfach:
+Wir nutzen eine **Push-to-Deploy** Strategie via `rsync`, um die Produktion sauber und sicher zu halten.
+(Siehe `DEPLOYMENT.md` für Details, falls verfügbar).
+
+Bei Updates:
 ```bash
-git pull
-docker compose up -d --build
+npm run build && \
+rsync -avz --exclude-from='.dockerignore' . user@server:~/hub-ideas/
 ```
