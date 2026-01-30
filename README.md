@@ -9,7 +9,9 @@ HubIdeas ist eine minimalistische, lokale Web-App zur Organisation von Projekten
 ### ⚡ Produktivität & Organisation
 - **Schnelle Erfassung**: Projekte und Aufgaben im Handumdrehen anlegen.
 - **Gedanken-Speicher**: Ein dedizierter Bereich für lose Ideen und Konzepte pro Projekt.
+- **Global-Suche**: Schnelles Finden von Projekten, Aufgaben und Gedanken über die zentrale Suchleiste im Menü.
 - **Project Sharing**: Teile Projekte mit anderen Nutzern und arbeite gemeinsam an Ideen. Die Urheber von Inhalten werden dabei transparent angezeigt.
+- **Warteraum & Status-Check**: Verbesserter Flow für die Freischaltung neuer Nutzer mit Echtzeit-Statusüberprüfung.
 
 ### 🤖 Smart AI Features (powered by Google Gemini)
 - **Dual-Mode Chat**:
@@ -23,6 +25,7 @@ HubIdeas ist eine minimalistische, lokale Web-App zur Organisation von Projekten
 
 ### 🎨 Design & UX
 - **Premium UI**: Modernes Interface mit Glassmorphism, Framer Motion Animationen und "Blobby"-Inputs.
+- **Slim Mobile UI**: Optimierte, flache Eingabefelder und sticky Navigation für eine perfekte Nutzung auf dem Smartphone.
 - **Clean Chat**: Kein Duplizieren von Nachrichten, stabile Ansichten auch bei Modus-Wechseln.
 - **Adaptive Themes**: Wähle zwischen einem eleganten Dark-Mode ("Slate & Purple") und einem frischen Light-Mode.
 

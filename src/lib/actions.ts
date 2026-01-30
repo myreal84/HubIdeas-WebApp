@@ -311,6 +311,11 @@ export async function saveChatMessage(projectId: string, role: string, content: 
     const userId = await getRequiredUserId();
     await checkProjectAccess(projectId, userId);
 
+    if (!content) {
+        console.warn('saveChatMessage received empty content. Saving as empty string.');
+        content = "";
+    }
+
     await prisma.chatMessage.create({
         data: { projectId, role, content, mode },
     });

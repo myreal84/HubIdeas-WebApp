@@ -20,7 +20,14 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { messages, projectContext, mode, referencedContext } = await req.json();
+        const body = await req.json();
+        console.log('Creates Debug: Received Body:', JSON.stringify(body, null, 2));
+        const { messages, projectContext, mode, referencedContext } = body;
+
+        if (!projectContext) {
+            console.error('Creates Debug: projectContext is missing in body!');
+        }
+
         const { title, notes, todos } = projectContext;
 
         // Check AI Limit
@@ -79,14 +86,58 @@ WICHTIG FÜR DEN DIALOG:
             system: systemPrompt,
             messages,
             onFinish: async (event) => {
-                if (event.usage.totalTokens > 0) {
+                const totalTokens = event.usage?.totalTokens || 0;
+                if (totalTokens > 0) {
                     const userId = session.user!.id!;
-                    await recordAiUsage(userId, event.usage.totalTokens);
+                    await recordAiUsage(userId, totalTokens);
                 }
             }
         });
 
-        return result.toDataStreamResponse();
+        // Result found, process the stream
+        // Try modern SDK response helpers first (they might be on the prototype)
+        const res = result as any;
+        if (typeof res.toUIMessageStreamResponse === 'function') {
+            console.log('✅ Using toUIMessageStreamResponse');
+            return res.toUIMessageStreamResponse();
+        }
+
+        if (typeof res.toDataStreamResponse === 'function') {
+            console.log('✅ Using toDataStreamResponse');
+            return res.toDataStreamResponse();
+        }
+
+        if (typeof res.toTextStreamResponse === 'function') {
+            console.log('⚠️ toData/UI missing, using toTextStreamResponse');
+            return res.toTextStreamResponse();
+        }
+
+        console.log('❌ All SDK response helpers missing! Falling back to manual Data Stream Protocol.');
+
+        // Manual Data Stream protocol for text-only stream
+        const stream = new ReadableStream({
+            async start(controller) {
+                const encoder = new TextEncoder();
+                try {
+                    for await (const chunk of result.textStream) {
+                        // 0: is the part type for text in Data Stream Protocol v1
+                        const part = `0:${JSON.stringify(chunk)}\n`;
+                        controller.enqueue(encoder.encode(part));
+                    }
+                } catch (streamError) {
+                    console.error('❌ Error during manual stream iteration:', streamError);
+                } finally {
+                    controller.close();
+                }
+            }
+        });
+
+        return new Response(stream, {
+            headers: {
+                'Content-Type': 'text/plain; charset=utf-8',
+                'X-Vercel-AI-Data-Stream': 'v1'
+            }
+        });
     } catch (error) {
         console.error('❌ Chat API Error:', error);
         return NextResponse.json({ error: 'Failed to process chat' }, { status: 500 });

@@ -1,12 +1,19 @@
 "use client";
 
-import { useChat, Message } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 import { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, Plus, MessageSquare, ListTodo, Paperclip, X, Loader2, CheckSquare } from 'lucide-react';
 import { Project } from '@/lib/types';
 import { saveChatMessage, addTodo } from '@/lib/actions';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+
+interface Message {
+    id: string;
+    role: 'user' | 'assistant' | 'system' | 'data';
+    content: string;
+    mode?: string;
+}
 
 type ProjectChatProps = {
     project: Project;
@@ -37,8 +44,10 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         chatModeRef.current = chatMode;
     }, [chatMode]);
 
-    const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-        api: '/api/ai/chat',
+    const [input, setInput] = useState('');
+
+    // Manual loading state derivation
+    const params = useChat({
         initialMessages: project.chatMessages.map(m => ({
             id: m.id,
             role: m.role as 'user' | 'assistant',
@@ -58,40 +67,84 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                 type: item.type
             })) : undefined
         },
-        onFinish: async (message) => {
+        onFinish: async ({ message }: { message: any }) => {
+            // In newer SDK versions, content might be empty but parts holds the text
+            let finalContent = message.content || "";
+            if (!finalContent && message.parts && Array.isArray(message.parts)) {
+                finalContent = message.parts
+                    .filter((p: any) => p.type === 'text')
+                    .map((p: any) => p.text)
+                    .join('');
+            }
+
             const modeAtTimeOfGeneration = chatModeRef.current;
-            await saveChatMessage(project.id, 'assistant', message.content, modeAtTimeOfGeneration);
+            await saveChatMessage(project.id, 'assistant', finalContent, modeAtTimeOfGeneration);
             // Persist the mode in our local shadow map
             setMessageModes(prev => ({ ...prev, [message.id]: modeAtTimeOfGeneration }));
 
             // Still attempt to update the AI SDK messages for consistency, though shadow map takes precedence
             // @ts-expect-error mode property is not in AI SDK types by default
-            setMessages(prev => prev.map(m => m.id === message.id ? { ...m, mode: modeAtTimeOfGeneration } : m));
-        }
-    });
+            setMessages(prev => prev.map((m: any) => m.id === message.id ? { ...m, mode: modeAtTimeOfGeneration, content: finalContent } : m));
 
-    const onFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        const userContent = input;
-        const currentMode = chatMode; // Capture current mode
-        handleSubmit(e);
-        // Persist user message
-        if (userContent.trim()) {
-            await saveChatMessage(project.id, 'user', userContent, currentMode);
-            // Manually persist the mode for the user message in local state (it's the last one)
-            setTimeout(() => {
-                // @ts-expect-error mode property is not in AI SDK types by default
-                setMessages(prev => {
-                    const last = prev[prev.length - 1];
-                    if (last && last.role === 'user') {
-                        return [...prev.slice(0, -1), { ...last, mode: currentMode }];
-                    }
-                    return prev;
-                });
-            }, 0);
         }
-        // Clear selected items after sending
+    } as any);
+
+    const { messages, status, sendMessage, setMessages } = params as any; // Cast to any to bypass strict type checking for now
+
+    const isLoading = status === 'streaming' || status === 'submitted';
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setInput(e.target.value);
+    };
+
+    const handleSubmit = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        if (!input.trim() || isLoading) return;
+
+        const userContent = input;
+        const currentMode = chatMode;
+
+        // Optimistically add user message? useChat usually handles this via sendMessage.
+        // We will just call sendMessage.
+
+        setInput(''); // Clear input immediately
+
+        await sendMessage({ role: 'user', content: userContent }, {
+            body: {
+                projectContext: {
+                    title: project.name,
+                    notes: project.notes.map(n => n.content),
+                    todos: project.todos.map(t => ({ content: t.content, isCompleted: t.isCompleted })),
+                },
+                mode: currentMode,
+                referencedContext: selectedItems.length > 0 ? selectedItems.map(item => ({
+                    title: item.title,
+                    content: item.content,
+                    type: item.type
+                })) : undefined
+            }
+        });
+
+        // User message persistence handled manually? 
+        // In previous code: saveChatMessage was called in onFormSubmit.
+        await saveChatMessage(project.id, 'user', userContent, currentMode);
+
+        // Manually update local messages for mode persistence if needed, 
+        // but sendMessage should add it to 'messages'. 
+        // We might need to map manual mode here.
+        setTimeout(() => {
+            setMessages((prev: any[]) => {
+                const last = prev[prev.length - 1];
+                if (last && last.role === 'user') {
+                    return [...prev.slice(0, -1), { ...last, mode: currentMode }];
+                }
+                return prev;
+            });
+        }, 0);
+
         setSelectedItems([]);
     };
+
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -129,8 +182,11 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         });
     };
 
-    const renderMessageContent = (content: string, role: string, messageId: string, messageMode?: string | null) => {
-        if (role !== 'assistant') return <p className="whitespace-pre-wrap">{content}</p>;
+    const renderMessageContent = (content: string | undefined | null, role: string, messageId: string, messageMode?: string | null) => {
+        // Safe fallback for empty/null content
+        const safeContent = content || "";
+
+        if (role !== 'assistant') return <p className="whitespace-pre-wrap">{safeContent}</p>;
 
         const adoptedIndices = adoptedTodoIndices[messageId] || new Set();
         // Use shadow state first, then message object mode, fallback to current chatMode
@@ -142,15 +198,15 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         let textAfterJson = "";
 
         const jsonRegex = /\[\s*\"[\s\S]*\"\s*\]/m;
-        const match = content.match(jsonRegex);
+        const match = safeContent.match(jsonRegex);
 
         if (match) {
             try {
                 const parsed = JSON.parse(match[0]);
                 if (Array.isArray(parsed)) {
                     jsonArray = parsed;
-                    textBeforeJson = content.substring(0, match.index).trim();
-                    textAfterJson = content.substring(match.index! + match[0].length).trim();
+                    textBeforeJson = safeContent.substring(0, match.index).trim();
+                    textAfterJson = safeContent.substring(match.index! + match[0].length).trim();
                 }
             } catch (e) {
                 console.error("Failed to parse extracted JSON:", e);
@@ -259,7 +315,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                                 )
                             }}
                         >
-                            {content}
+                            {safeContent}
                         </ReactMarkdown>
                     </div>
                 )}
@@ -303,7 +359,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                 </div>
             </div>
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4 lg:space-y-6 custom-scrollbar">
                 <AnimatePresence initial={false}>
                     {messages.length === 0 && (
                         <motion.div
@@ -317,7 +373,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                         </motion.div>
                     )}
                     {/* Deduplicate messages by ID to prevent double bubbles if re-renders occur */}
-                    {messages.filter((m, i, self) => i === self.findIndex(t => t.id === m.id)).map((m: Message) => (
+                    {messages.filter((m: any, i: number, self: any[]) => i === self.findIndex((t: any) => t.id === m.id)).map((m: any) => (
                         <motion.div
                             key={m.id}
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -329,11 +385,16 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                                 }`}>
                                 {m.role === 'user' ? <User size={20} /> : <Bot size={20} />}
                             </div>
-                            <div className={`max-w-[80%] p-4 rounded-2xl ${m.role === 'user'
+                            <div className={`max-w-[85%] lg:max-w-[80%] p-3 lg:p-4 rounded-2xl ${m.role === 'user'
                                 ? 'bg-primary border border-primary/20 text-white rounded-tr-none shadow-xl'
                                 : 'bg-card border border-border text-foreground rounded-tl-none shadow-xl'
                                 }`}>
-                                {renderMessageContent(m.content, m.role, m.id, (m as { mode?: string | null }).mode)}
+                                {renderMessageContent(
+                                    m.content || (m.parts && Array.isArray(m.parts) ? m.parts.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') : ""),
+                                    m.role,
+                                    m.id,
+                                    (m as { mode?: string | null }).mode
+                                )}
                             </div>
                         </motion.div>
                     ))}
@@ -352,7 +413,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                 )}
             </div>
 
-            <div className="p-4 pb-48 lg:pb-8 bg-background/80 border-t border-border backdrop-blur-3xl pb-safe space-y-3">
+            <div className="p-3 lg:p-4 pb-24 lg:pb-8 bg-background/80 border-t border-border backdrop-blur-3xl pb-safe space-y-3">
                 {/* Context Chips */}
                 <AnimatePresence>
                     {selectedItems.length > 0 && (
@@ -379,7 +440,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                     )}
                 </AnimatePresence>
 
-                <form onSubmit={onFormSubmit} className="flex gap-4 max-w-4xl mx-auto relative items-end">
+                <form onSubmit={handleSubmit} className="flex gap-4 max-w-4xl mx-auto relative items-end">
                     {/* Context Picker Button & Dropdown */}
                     <div className="relative" ref={pickerRef}>
                         <button
@@ -445,13 +506,13 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                         value={input}
                         onChange={handleInputChange}
                         disabled={isLoading || aiTokensUsed >= aiTokenLimit}
-                        placeholder={aiTokensUsed >= aiTokenLimit ? "Token Limit erreicht." : (chatMode === 'conversation' ? "Frag mich was..." : "Was soll ich planen?")}
-                        className="flex-1 bg-card border border-border rounded-xl px-6 py-4 text-lg text-foreground outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/30 shadow-inner disabled:opacity-50 disabled:cursor-not-allowed"
+                        placeholder={aiTokensUsed >= aiTokenLimit ? "Limit." : (chatMode === 'conversation' ? "Frag mich..." : "Planen?")}
+                        className="flex-1 bg-card border border-border rounded-xl px-4 lg:px-6 py-2.5 lg:py-4 text-sm lg:text-lg text-foreground outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/30 shadow-inner disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <button
                         type="submit"
                         disabled={isLoading || !input.trim() || aiTokensUsed >= aiTokenLimit}
-                        className="bg-primary text-white p-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-30 shadow-lg h-[60px] w-[60px] flex items-center justify-center flex-shrink-0"
+                        className="bg-primary text-white p-3 lg:p-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-30 shadow-lg h-[46px] lg:h-[60px] w-[46px] lg:w-[60px] flex items-center justify-center flex-shrink-0"
                     >
                         <Send size={20} />
                     </button>

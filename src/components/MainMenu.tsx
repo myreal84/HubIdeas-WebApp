@@ -15,10 +15,12 @@ import {
     Sparkles,
     ArrowRight,
     Shield,
-    LogOut
+    LogOut,
+    ListTodo
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
+import { motion, AnimatePresence } from 'framer-motion';
 import { signOut } from 'next-auth/react';
 
 import PushManager from './PushManager';
@@ -45,8 +47,22 @@ export default function MainMenu({
     pendingUsersCount = 0
 }: MainMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [searchResults, setSearchResults] = useState<any[]>([]);
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        if (searchQuery.length > 1) {
+            const timer = setTimeout(async () => {
+                const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+                const data = await res.json();
+                setSearchResults(data.results || []);
+            }, 300);
+            return () => clearTimeout(timer);
+        } else {
+            setSearchResults([]);
+        }
+    }, [searchQuery]);
 
     useEffect(() => setMounted(true), []);
 
@@ -61,8 +77,8 @@ export default function MainMenu({
             >
                 <div className="relative">
                     <MenuIcon size={20} className="group-hover:rotate-12 transition-transform" />
-                    {(activeCount > 0 || pendingUsersCount > 0) && (
-                        <div className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-background ${pendingUsersCount > 0 ? 'bg-amber-500' : 'bg-primary'}`} />
+                    {pendingUsersCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-background bg-amber-500" />
                     )}
                 </div>
             </button>
@@ -127,11 +143,41 @@ export default function MainMenu({
                                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={20} />
                                 <input
                                     type="text"
-                                    placeholder="Projekt finden..."
+                                    placeholder="Projekte, Notizen, Aufgaben..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="w-full bg-foreground/5 border border-border rounded-2xl py-4 pl-14 pr-6 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
                                 />
+                                <AnimatePresence>
+                                    {searchResults.length > 0 && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            className="absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden z-50"
+                                        >
+                                            {searchResults.map((res: any) => (
+                                                <Link
+                                                    key={`${res.type}-${res.id}`}
+                                                    href={res.url}
+                                                    onClick={() => {
+                                                        setIsOpen(false);
+                                                        setSearchQuery("");
+                                                    }}
+                                                    className="flex flex-col p-4 hover:bg-primary/5 border-b border-border last:border-0 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        {res.type === 'project' && <Zap size={14} className="text-primary" />}
+                                                        {res.type === 'todo' && <ListTodo size={14} className="text-accent" />}
+                                                        {res.type === 'note' && <Sparkles size={14} className="text-amber-500" />}
+                                                        <span className="font-bold text-sm line-clamp-1">{res.title}</span>
+                                                    </div>
+                                                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">{res.subtitle}</span>
+                                                </Link>
+                                            ))}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         </div>
 

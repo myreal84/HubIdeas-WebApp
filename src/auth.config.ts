@@ -47,10 +47,12 @@ export const authConfig = {
         },
         authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user;
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const isApproved = (auth?.user as any)?.status === "APPROVED";
             const isOnLogin = nextUrl.pathname.startsWith("/login");
             const isOnWaitingRoom = nextUrl.pathname === "/waiting-room";
+            const isStatusApi = nextUrl.pathname === "/api/user/status";
+
+            console.log(`[Middleware] Path: ${nextUrl.pathname}, isLoggedIn: ${isLoggedIn}, isApproved: ${isApproved}`);
 
             if (isOnLogin) {
                 if (isLoggedIn) {
@@ -61,9 +63,13 @@ export const authConfig = {
                 return true;
             }
 
-            if (!isLoggedIn) return false;
+            if (!isLoggedIn) {
+                console.log(`[Middleware] Not logged in, redirecting to login from ${nextUrl.pathname}`);
+                return false;
+            }
 
-            if (!isApproved && !isOnWaitingRoom) {
+            if (!isApproved && !isOnWaitingRoom && !isStatusApi) {
+                console.log(`[Middleware] Not approved, redirecting to waiting-room from ${nextUrl.pathname}`);
                 return Response.redirect(new URL("/waiting-room", nextUrl));
             }
 

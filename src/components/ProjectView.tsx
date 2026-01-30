@@ -156,8 +156,8 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
             </header>
 
             {/* Mobile Tabs & Sticky Input Header */}
-            <div className="lg:hidden sticky top-2 z-40 space-y-2 mb-6">
-                <div className="grid grid-cols-3 p-1 bg-background/80 backdrop-blur-2xl rounded-2xl border border-border shadow-2xl">
+            <div className="lg:hidden sticky top-2 z-40 mb-6">
+                <div className="grid grid-cols-3 p-1 bg-background/80 backdrop-blur-2xl rounded-t-2xl border border-border shadow-2xl">
                     <button
                         onClick={() => setActiveTab("todos")}
                         className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl font-bold uppercase tracking-widest text-[8px] transition-all ${activeTab === "todos"
@@ -190,27 +190,27 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
                     </button>
                 </div>
 
-                {/* Slim Inline Input for Mobile */}
+                {/* Slim Inline Input for Mobile - Integrated with Tabs */}
                 {activeTab !== 'chat' && !project.isArchived && mounted && (
                     <motion.form
-                        initial={{ opacity: 0, y: -10 }}
+                        initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
                         onSubmit={handleSubmit}
-                        className="flex gap-2 p-1.5 bg-background/60 rounded-xl border border-border backdrop-blur-xl shadow-xl"
+                        className="flex gap-2 p-1 bg-background/60 rounded-b-2xl border-x border-b border-border backdrop-blur-xl shadow-xl border-t-0"
                     >
                         <input
                             type="text"
                             value={activeTab === "todos" ? todoInputValue : noteInputValue}
                             onChange={(e) => activeTab === "todos" ? setTodoInputValue(e.target.value) : setNoteInputValue(e.target.value)}
                             placeholder={activeTab === "todos" ? "Aufgabe hinzufügen..." : "Gedanke festhalten..."}
-                            className="flex-1 bg-transparent border-none outline-none px-4 py-2 text-sm font-bold placeholder:text-muted-foreground/30 text-foreground"
+                            className="flex-1 bg-transparent border-none outline-none px-3 py-1.5 text-xs font-bold placeholder:text-muted-foreground/30 text-foreground"
                         />
                         <button
                             type="submit"
                             disabled={loading || !(activeTab === "todos" ? todoInputValue : noteInputValue).trim()}
-                            className="p-2 aspect-square rounded-lg bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center transition-all active:scale-95 disabled:opacity-30 flex-shrink-0"
+                            className="w-10 h-8 rounded-lg bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center transition-all active:scale-95 disabled:opacity-30 flex-shrink-0"
                         >
-                            {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={20} strokeWidth={3} />}
+                            {loading ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={16} strokeWidth={3} />}
                         </button>
                     </motion.form>
                 )}
@@ -465,9 +465,9 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
             </div>
 
             {/* AI Chat Overlay for Desktop */}
-            {isChatOpen && mounted && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 lg:p-8 bg-background/90 backdrop-blur-2xl animate-in fade-in duration-300">
-                    <div className="relative w-full max-w-4xl h-[85vh] bg-card border border-border rounded-[2.5rem] shadow-[0_0_150px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+            {mounted && createPortal(
+                <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 lg:p-8 bg-background/90 backdrop-blur-2xl transition-all duration-300 ${isChatOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                    <div className={`relative w-full max-w-4xl h-[85vh] bg-card border border-border rounded-[2.5rem] shadow-[0_0_150px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col transition-all duration-300 ${isChatOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}>
                         {/* Header */}
                         <div className="p-6 lg:px-10 lg:py-8 border-b border-border flex items-center justify-between bg-gradient-to-r from-primary/10 to-transparent">
                             <div className="flex items-center gap-4">

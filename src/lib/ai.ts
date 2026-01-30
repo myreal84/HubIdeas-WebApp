@@ -35,7 +35,7 @@ export async function generateSuggestedTodos(title: string, note?: string) {
 
         return {
             suggestions: (object as { suggestions: string[] }).suggestions,
-            tokens: usage.totalTokens
+            tokens: usage?.totalTokens || 0
         };
     } catch (error) {
         console.error('❌ AI Suggestion Error:', error);
@@ -60,7 +60,7 @@ export async function generateResurfacingMessage(title: string, notes: string[])
 
         return {
             text: text.trim(),
-            tokens: usage.totalTokens
+            tokens: usage?.totalTokens || 0
         };
     } catch (error) {
         console.error('❌ AI Resurfacing Error:', error);
