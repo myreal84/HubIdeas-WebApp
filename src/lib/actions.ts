@@ -114,6 +114,21 @@ export async function updateProjectStatus(id: string, isArchived: boolean) {
     revalidatePath(`/project/${id}`);
 }
 
+export async function updateProjectName(id: string, name: string) {
+    const userId = await getRequiredUserId();
+    // Access check: owner or collaborator
+    await checkProjectAccess(id, userId);
+
+    if (!name.trim()) throw new Error("Der Projektname darf nicht leer sein.");
+
+    await prisma.project.update({
+        where: { id },
+        data: { name },
+    });
+    revalidatePath("/");
+    revalidatePath(`/project/${id}`);
+}
+
 export async function touchProject(id: string) {
     const userId = await getRequiredUserId();
     // Access check

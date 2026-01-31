@@ -31,7 +31,8 @@ import {
     addNote,
     deleteNote,
     updateTodo,
-    updateNote
+    updateNote,
+    updateProjectName
 } from "@/lib/actions";
 
 type ProjectViewProps = {
@@ -54,6 +55,15 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
     const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [editContent, setEditContent] = useState("");
+
+    // Project Name Edit State
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [nameInputValue, setNameInputValue] = useState(project.name);
+
+    // Sync local name state just in case props change (e.g. real-time)
+    useEffect(() => {
+        setNameInputValue(project.name);
+    }, [project.name]);
 
     useEffect(() => {
         setMounted(true);
@@ -99,6 +109,15 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
         setEditContent("");
     };
 
+    const handleSaveName = async () => {
+        if (!nameInputValue.trim() || nameInputValue === project.name) {
+            setIsEditingName(false);
+            return;
+        }
+        await updateProjectName(project.id, nameInputValue);
+        setIsEditingName(false);
+    };
+
     // Sort todos: active first, then completed (both by creation date)
     const sortedTodos = [...project.todos].sort((a, b) => {
         if (a.isCompleted === b.isCompleted) {
@@ -115,9 +134,41 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
                         <ArrowLeft size={16} className="lg:w-6 lg:h-6 group-hover:-translate-x-1 transition-transform text-muted-foreground group-hover:text-primary" />
                     </Link>
                     <div className="flex-1 min-w-0">
-                        <h1 className={`text-xl md:text-5xl lg:text-3xl font-black title-font tracking-tight leading-tight line-clamp-2 ${project.isArchived ? 'opacity-30 line-through' : 'text-foreground'}`}>
-                            {project.name}
-                        </h1>
+                        <div className="flex items-center gap-3 group">
+                            {isEditingName ? (
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={nameInputValue}
+                                    onChange={(e) => setNameInputValue(e.target.value)}
+                                    onBlur={handleSaveName}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSaveName();
+                                        if (e.key === 'Escape') {
+                                            setNameInputValue(project.name);
+                                            setIsEditingName(false);
+                                        }
+                                    }}
+                                    className="text-xl md:text-5xl lg:text-3xl font-black title-font tracking-tight leading-tight bg-transparent border-b-2 border-primary outline-none min-w-[200px]"
+                                />
+                            ) : (
+                                <h1
+                                    className={`text-xl md:text-5xl lg:text-3xl font-black title-font tracking-tight leading-tight line-clamp-2 ${project.isArchived ? 'opacity-30 line-through' : 'text-foreground'}`}
+                                >
+                                    {project.name}
+                                </h1>
+                            )}
+
+                            {!isEditingName && !project.isArchived && (
+                                <button
+                                    onClick={() => setIsEditingName(true)}
+                                    className="p-1.5 rounded-full text-muted-foreground/30 hover:bg-foreground/5 hover:text-primary transition-all opacity-0 group-hover:opacity-100"
+                                    title="Titel bearbeiten"
+                                >
+                                    <Pencil size={18} />
+                                </button>
+                            )}
+                        </div>
                         <div className="flex items-center gap-3 mt-1 lg:mt-3">
                             {project.isArchived ? (
                                 <span className="flex items-center gap-2 text-slate-400 font-bold text-[9px] lg:text-xs uppercase tracking-widest bg-slate-400/10 px-2 lg:px-3 py-1 lg:py-1.5 rounded-full border border-slate-400/20">
