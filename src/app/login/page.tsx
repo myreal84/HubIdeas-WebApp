@@ -5,32 +5,103 @@ import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
     const [loading, setLoading] = useState(false);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+
+    const allowCredentials = process.env.NEXT_PUBLIC_ALLOW_CREDENTIALS === "true";
 
     const handleGoogleLogin = () => {
         setLoading(true);
         signIn("google", { callbackUrl: "/" });
     };
 
+    const handleCredentialsLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError("");
+
+        try {
+            const res = await signIn("credentials", {
+                email,
+                password,
+                redirect: false,
+                callbackUrl: "/"
+            });
+
+            if (res?.error) {
+                setError("Ungültige E-Mail oder Passwort.");
+                setLoading(false);
+            } else {
+                window.location.href = "/";
+            }
+        } catch (err) {
+            setError("Ein Fehler ist aufgetreten.");
+            setLoading(false);
+        }
+    };
+
     return (
-        <div className="min-h-screen flex items-center justify-center p-6 animate-fade-in">
+        <div className="min-h-screen flex items-center justify-center p-6 animate-fade-in text-white">
             <div className="w-full max-w-md">
-                <div className="card-premium !p-12 backdrop-blur-3xl relative overflow-hidden">
+                <div className="card-premium !p-12 backdrop-blur-3xl relative overflow-hidden bg-slate-900/50 border border-white/10 rounded-[2rem]">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-primary animate-pulse" />
 
-                    <div className="text-center mb-12">
+                    <div className="text-center mb-10">
                         <h1 className="text-5xl font-black title-font tracking-tighter mb-4 text-white">
                             HubIdeas
                         </h1>
-                        <p className="text-slate-400 font-medium">Willkommen zurück. Melde dich an, um auf deine Ideen zuzugreifen.</p>
+                        <p className="text-slate-400 font-medium italic">Vom Gedanken zum Projekt.</p>
                     </div>
 
                     <div className="space-y-6">
+                        {allowCredentials ? (
+                            <form onSubmit={handleCredentialsLogin} className="space-y-4">
+                                <div>
+                                    <input
+                                        type="email"
+                                        placeholder="E-Mail"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/50 transition-all"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <input
+                                        type="password"
+                                        placeholder="Passwort"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/50 transition-all"
+                                        required
+                                    />
+                                </div>
+                                {error && <p className="text-red-400 text-xs font-bold">{error}</p>}
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full py-4 bg-primary text-white rounded-xl font-black uppercase tracking-widest hover:brightness-110 transition-all disabled:opacity-50"
+                                >
+                                    {loading ? "Lädt..." : "Anmelden"}
+                                </button>
+                                <div className="relative py-4">
+                                    <div className="absolute inset-0 flex items-center">
+                                        <div className="w-full border-t border-white/10"></div>
+                                    </div>
+                                    <div className="relative flex justify-center text-xs uppercase">
+                                        <span className="bg-[#0f172a] px-2 text-slate-500 font-bold">Oder</span>
+                                    </div>
+                                </div>
+                            </form>
+                        ) : null}
+
                         <button
                             onClick={handleGoogleLogin}
                             disabled={loading}
                             className="w-full py-4 px-6 bg-white text-black rounded-2xl font-bold flex items-center justify-center gap-4 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-2xl relative overflow-hidden group"
                         >
-                            {loading ? (
+                            {loading && !allowCredentials ? (
                                 <div className="w-6 h-6 border-4 border-black/10 border-t-black rounded-full animate-spin" />
                             ) : (
                                 <>

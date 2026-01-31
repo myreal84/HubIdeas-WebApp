@@ -1,5 +1,8 @@
 import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
 import type { NextAuthConfig } from "next-auth";
+import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 // --- Helpers ---
 
@@ -12,6 +15,47 @@ export const authConfig = {
         Google({
             clientId: process.env.AUTH_GOOGLE_ID,
             clientSecret: process.env.AUTH_GOOGLE_SECRET,
+        }),
+        Credentials({
+            name: "Credentials",
+            credentials: {
+                email: { label: "Email", type: "email" },
+                password: { label: "Password", type: "password" }
+            },
+            async authorize(credentials) {
+                if (!credentials?.email || !credentials?.password) return null;
+
+                const email = normalizeEmail(credentials.email as string) as string;
+                const password = credentials.password as string;
+
+                // Find user in DB
+                let user = await prisma.user.findUnique({
+                    where: { email }
+                });
+
+                if (user && user.password) {
+                    // Check password
+                    const isValid = await bcrypt.compare(password, user.password);
+                    if (!isValid) return null;
+                    return user;
+                } else if (!user) {
+                    // Staging logic: Auto-create user on first login if it's for staging/testing
+                    // but stay in WAITING status (requires admin approval)
+                    const hashedPassword = await bcrypt.hash(password, 10);
+                    user = await prisma.user.create({
+                        data: {
+                            email,
+                            password: hashedPassword,
+                            name: email.split('@')[0],
+                            status: "WAITING",
+                            role: "USER"
+                        }
+                    });
+                    return user;
+                }
+
+                return null;
+            }
         }),
     ],
     pages: {
