@@ -4,24 +4,24 @@ import { redirect } from "next/navigation";
 import ProjectForm from "@/components/ProjectForm";
 import ProjectDashboard from "@/components/ProjectDashboard";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export default function DashboardPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     if (!data) setLoading(true);
     const res = await fetch('/api/dashboard');
     const json = await res.json();
     setData(json);
     setLoading(false);
-  }
+  }, [data]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   if (loading) return null;
   if (!data.session) redirect("/login");
