@@ -126,56 +126,79 @@ export default function ProjectForm({ onProjectCreated }: { onProjectCreated?: (
                 </div>
             </form>
 
-            {/* AI Suggestions Popup - Portal to body to fix stacking context */}
+            {/* AI Suggestions Popup - Premium Redesign */}
             {showSuggestions && mounted && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-background/90 backdrop-blur-2xl animate-in fade-in duration-300 isolate">
-                    <div className="relative w-full max-w-lg bg-card border border-border rounded-3xl shadow-[0_0_150px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-300">
-                        <div className="p-6 border-b border-border flex items-center justify-between bg-gradient-to-r from-primary/20 via-primary/5 to-transparent">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-primary/20 rounded-xl">
-                                    <Sparkles className="text-primary" size={20} />
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl animate-in fade-in duration-500">
+                    <div className="relative w-full max-w-xl bg-[#0F1117] border border-white/10 rounded-[2rem] shadow-[0_0_100px_rgba(124,58,237,0.15)] overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-5 duration-500 flex flex-col max-h-[85vh]">
+
+                        {/* Header with animated gradient */}
+                        <div className="relative p-8 pb-6 border-b border-white/5 flex items-center justify-between z-10 overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-50" />
+                            <div className="flex items-center gap-5 relative z-10">
+                                <div className="p-3 bg-gradient-to-br from-primary to-violet-600 rounded-2xl shadow-lg shadow-primary/20 ring-1 ring-white/10">
+                                    <Sparkles className="text-white" size={24} strokeWidth={2} />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-lg text-white">KI-Vorschläge</h3>
-                                    <p className="text-xs text-slate-400">Direkt loslegen mit diesen Schritten</p>
+                                    <h3 className="font-black text-2xl text-white tracking-tight leading-none mb-1.5">KI-Vorschläge</h3>
+                                    <p className="text-sm text-slate-400 font-medium">Bekomme Starthilfe für dein Projekt</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setShowSuggestions(false)}
-                                className="p-2 hover:bg-slate-800 rounded-full text-slate-500 hover:text-white transition-colors"
+                                className="relative z-10 p-3 hover:bg-white/5 rounded-full text-slate-400 hover:text-white transition-all hover:rotate-90 active:scale-90"
                             >
-                                <X size={20} />
+                                <X size={24} />
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar bg-[#0f172a]">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-3 relative">
+                            {/* Ambient background glow */}
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-[200px] bg-primary/5 blur-[100px] pointer-events-none" />
+
                             {suggesting ? (
-                                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                                <div className="flex flex-col items-center justify-center py-20 gap-6 relative z-10">
                                     <div className="relative">
-                                        <div className="absolute inset-0 bg-primary/20 blur-2xl animate-pulse rounded-full" />
-                                        <Loader2 className="text-primary animate-spin relative" size={48} />
+                                        <div className="absolute inset-0 bg-primary/30 blur-3xl animate-pulse rounded-full" />
+                                        <div className="relative p-6 bg-white/5 border border-white/10 rounded-full animate-spin-slow">
+                                            <Loader2 className="text-primary animate-spin" size={40} />
+                                        </div>
                                     </div>
-                                    <p className="text-slate-400 animate-pulse font-medium">Überlege mir was...</p>
+                                    <div className="text-center space-y-2">
+                                        <h4 className="text-lg font-bold text-white animate-pulse">Analysiere deine Idee...</h4>
+                                        <p className="text-sm text-slate-500">Suche nach passenden Aufgaben</p>
+                                    </div>
                                 </div>
                             ) : (
                                 suggestions.map((s, i) => (
                                     <div
                                         key={i}
-                                        className={`group flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 ${addedIndices.has(i)
-                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 translate-x-1'
-                                            : 'bg-foreground/5 border-border hover:border-primary/50 hover:bg-foreground/10 text-foreground shadow-sm'
+                                        className={`group relative flex items-center justify-between p-4 pl-5 rounded-2xl border transition-all duration-300 ${addedIndices.has(i)
+                                            ? 'bg-emerald-500/5 border-emerald-500/20'
+                                            : 'bg-white/[0.03] border-white/5 hover:border-primary/30 hover:bg-white/[0.06] hover:shadow-xl hover:shadow-black/20 hover:-translate-y-0.5'
                                             }`}
                                     >
-                                        <p className="font-medium pr-4 leading-relaxed">{s}</p>
+                                        <div className="flex items-start gap-4 pr-4">
+                                            <div className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors duration-500 ${addedIndices.has(i) ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-slate-600 group-hover:bg-primary'
+                                                }`} />
+                                            <p className={`text-sm md:text-base font-medium leading-relaxed transition-colors ${addedIndices.has(i) ? 'text-emerald-400/80 line-through decoration-emerald-500/30' : 'text-slate-200 group-hover:text-white'
+                                                }`}>
+                                                {s}
+                                            </p>
+                                        </div>
+
                                         <button
                                             onClick={() => handleAddSuggestion(s, i)}
                                             disabled={addedIndices.has(i)}
-                                            className={`flex-shrink-0 p-2.5 rounded-xl transition-all duration-300 ${addedIndices.has(i)
-                                                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                                                : 'bg-foreground/10 hover:bg-primary hover:text-white text-muted-foreground group-hover:scale-110 active:scale-95'
+                                            className={`flex-shrink-0 relative w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-300 ${addedIndices.has(i)
+                                                ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
+                                                : 'bg-white/5 text-slate-400 hover:bg-primary hover:text-white hover:scale-110 hover:shadow-lg hover:shadow-primary/25 active:scale-95'
                                                 }`}
                                         >
-                                            {addedIndices.has(i) ? <Check size={20} /> : <Plus size={20} />}
+                                            {addedIndices.has(i) ? (
+                                                <Check size={18} strokeWidth={3} className="animate-in zoom-in spin-in-90 duration-300" />
+                                            ) : (
+                                                <Plus size={18} strokeWidth={3} />
+                                            )}
                                         </button>
                                     </div>
                                 ))
@@ -183,10 +206,10 @@ export default function ProjectForm({ onProjectCreated }: { onProjectCreated?: (
                         </div>
 
                         {!suggesting && (
-                            <div className="p-6 bg-card border-t border-border flex gap-3">
+                            <div className="p-6 border-t border-white/5 bg-[#0F1117]/50 backdrop-blur-md relative z-20">
                                 <button
                                     onClick={() => setShowSuggestions(false)}
-                                    className="flex-1 py-4 bg-primary text-white font-black uppercase tracking-widest text-xs rounded-2xl transition-all hover:scale-[1.01] active:scale-[0.99] shadow-xl shadow-primary/20"
+                                    className="w-full py-4 bg-gradient-to-r from-primary to-violet-600 text-white font-bold uppercase tracking-widest text-xs rounded-2xl transition-all hover:brightness-110 active:scale-[0.98] shadow-lg shadow-primary/25 border border-white/10"
                                 >
                                     Fertig
                                 </button>
