@@ -157,7 +157,7 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
 
             {/* Mobile Tabs & Sticky Input Header */}
             <div className="lg:hidden sticky top-2 z-40 mb-6">
-                <div className="grid grid-cols-3 p-1 bg-background/80 backdrop-blur-2xl rounded-t-2xl border border-border shadow-2xl">
+                <div className="grid grid-cols-2 p-1 bg-background/80 backdrop-blur-2xl rounded-t-2xl border border-border shadow-2xl">
                     <button
                         onClick={() => setActiveTab("todos")}
                         className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl font-bold uppercase tracking-widest text-[8px] transition-all ${activeTab === "todos"
@@ -178,20 +178,10 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
                         <StickyNote size={14} />
                         <span>Gedanken</span>
                     </button>
-                    <button
-                        onClick={() => setActiveTab("chat")}
-                        className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl font-bold uppercase tracking-widest text-[8px] transition-all ${activeTab === "chat"
-                            ? 'bg-gradient-to-br from-primary to-accent text-white shadow-lg'
-                            : 'text-slate-500'
-                            }`}
-                    >
-                        <MessageSquare size={14} />
-                        <span>Chat</span>
-                    </button>
                 </div>
 
                 {/* Slim Inline Input for Mobile - Integrated with Tabs */}
-                {activeTab !== 'chat' && !project.isArchived && mounted && (
+                {!project.isArchived && mounted && (
                     <motion.form
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -452,16 +442,7 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
                     <div className="lg:hidden h-16" />
                 </div>
 
-                {/* Mobile-only Chat Section (Hidden on Desktop because of Overlay) */}
-                <div className={`${activeTab !== "chat" ? "hidden" : "block"} lg:hidden col-span-1 space-y-4 h-[calc(100vh-200px)] min-h-[550px]`}>
-                    <div className="flex items-center gap-4 bg-foreground/5 py-3 px-6 rounded-2xl border border-border">
-                        <h2 className="text-lg font-black text-foreground/90 uppercase tracking-widest leading-none">Projekt Assistent</h2>
-                        <span className="text-[10px] font-black text-accent bg-accent/10 px-2 py-1 rounded-md border border-accent/20 uppercase tracking-tighter">
-                            KI-Powered
-                        </span>
-                    </div>
-                    <ProjectChat project={project} aiTokensUsed={aiTokensUsed} aiTokenLimit={aiTokenLimit} />
-                </div>
+
             </div>
 
             {/* AI Chat Overlay for Desktop */}
