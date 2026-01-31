@@ -24,8 +24,13 @@ export async function POST(req: Request) {
         console.log('Creates Debug: Received Body:', JSON.stringify(body, null, 2));
         const { messages, projectContext, mode, referencedContext } = body;
 
+        // Log API Key presence (safe)
+        const rawApiKey = process.env.GOOGLE_GENERATION_AI_API_KEY;
+        console.log(`[API] Google Key present: ${!!rawApiKey}, Length: ${rawApiKey?.length || 0}, Preview: ${rawApiKey ? rawApiKey.substring(0, 5) + '...' : 'N/A'}`);
+
         if (!projectContext) {
             console.error('Creates Debug: projectContext is missing in body!');
+            return NextResponse.json({ error: 'projectContext is required' }, { status: 400 });
         }
 
         const { title, notes, todos } = projectContext;

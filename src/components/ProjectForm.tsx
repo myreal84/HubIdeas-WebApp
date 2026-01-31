@@ -103,7 +103,7 @@ export default function ProjectForm({ onProjectCreated }: { onProjectCreated?: (
                             value={note}
                             onChange={(e) => setNote(e.target.value)}
                             placeholder="Hast du schon Details oder Notizen dazu?"
-                            className="w-full bg-foreground/5 border border-border rounded-2xl p-4 text-foreground outline-none focus:border-primary/50 transition-all min-h-[100px] font-medium placeholder:text-muted-foreground/40"
+                            className="w-full input-glow p-4 min-h-[100px] font-medium placeholder:text-muted-foreground/40"
                             disabled={loading}
                         />
                     </div>

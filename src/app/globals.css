@@ -23,6 +23,11 @@
     --gradient-start: rgba(99, 102, 241, 0.12);
     --gradient-end: rgba(139, 92, 246, 0.06);
     --selection: rgba(99, 102, 241, 0.3);
+
+    /* Custom Theme Variables */
+    --card-premium-bg: rgba(15, 23, 42, 0.6);
+    --card-premium-hover: rgba(15, 23, 42, 0.8);
+    --card-premium-border: rgba(255, 255, 255, 0.08);
   }
 
   [data-theme='light'] {
@@ -30,20 +35,30 @@
     --foreground: #0f172a;
     --card: #ffffff;
     --card-foreground: #0f172a;
-    --primary: #6366f1;
-    --primary-glow: rgba(99, 102, 241, 0.2);
+    --primary: #10b981;
+    /* Emerald-500 */
+    --primary-glow: rgba(16, 185, 129, 0.3);
     --primary-foreground: #ffffff;
     --secondary: #f1f5f9;
     --secondary-foreground: #475569;
-    --accent: #8b5cf6;
+    --accent: #14b8a6;
+    /* Teal-500 */
     --muted: #f1f5f9;
     --muted-foreground: #64748b;
     --border: rgba(15, 23, 42, 0.08);
     --input: #ffffff;
-    --ring: #6366f1;
-    --gradient-start: rgba(99, 102, 241, 0.08);
-    --gradient-end: rgba(255, 255, 255, 1);
-    --selection: rgba(99, 102, 241, 0.2);
+    --ring: #10b981;
+
+    /* Fresh Green Gradient */
+    --gradient-start: rgba(16, 185, 129, 0.15);
+    --gradient-end: rgba(20, 184, 166, 0.1);
+    --selection: rgba(16, 185, 129, 0.2);
+
+    /* Light Mode Card Overrides */
+    --input-bg: rgba(255, 255, 255, 0.7);
+    --card-premium-bg: rgba(255, 255, 255, 0.7);
+    --card-premium-hover: rgba(255, 255, 255, 0.95);
+    --card-premium-border: rgba(16, 185, 129, 0.2);
   }
 
   * {
@@ -108,7 +123,7 @@
   }
 
   .input-glow {
-    background-color: rgba(15, 23, 42, 0.5);
+    background-color: var(--input-bg);
     border: 1px solid var(--border);
     @apply rounded-2xl px-6 py-4 text-foreground outline-none transition-all;
   }
@@ -120,19 +135,19 @@
   }
 
   .card-premium {
-    background-color: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(8px);
+    background-color: var(--card-premium-bg);
+    backdrop-filter: blur(12px);
     border: 1px solid var(--border);
     @apply rounded-[2rem] p-8 transition-all duration-500 ease-out;
   }
 
   .card-premium:hover {
-    background-color: rgba(15, 23, 42, 0.8);
-    border-color: rgba(99, 102, 241, 0.4);
+    background-color: var(--card-premium-hover);
+    border-color: var(--card-premium-border);
     @apply translate-y-[-4px];
     box-shadow:
-      0 20px 40px -12px rgba(0, 0, 0, 0.4),
-      0 0 0 1px rgba(99, 102, 241, 0.2);
+      0 20px 40px -12px rgba(0, 0, 0, 0.1),
+      0 0 0 1px var(--border);
   }
 }
 

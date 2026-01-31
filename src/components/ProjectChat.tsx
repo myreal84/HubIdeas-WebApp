@@ -2,7 +2,7 @@
 
 import { useChat } from '@ai-sdk/react';
 import { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Plus, MessageSquare, ListTodo, Paperclip, X, Loader2, CheckSquare } from 'lucide-react';
+import { Send, User, Bot, Plus, MessageSquare, ListTodo, Paperclip, X, Loader2, CheckSquare, Copy, Check } from 'lucide-react';
 import { Project } from '@/lib/types';
 import { saveChatMessage, addTodo } from '@/lib/actions';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -45,6 +45,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
     }, [chatMode]);
 
     const [input, setInput] = useState('');
+    const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
     // Manual loading state derivation
     const params = useChat({
@@ -182,6 +183,46 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         });
     };
 
+    const handleCopy = async (content: string, messageId: string) => {
+        try {
+            // Modern API (Requires HTTPS or Localhost)
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(content);
+                setCopiedMessageId(messageId);
+                setTimeout(() => setCopiedMessageId(null), 2000);
+            } else {
+                throw new Error('Clipboard API not available');
+            }
+        } catch (err) {
+            // Fallback for HTTP / Non-Secure Contexts
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = content;
+
+                // Ensure it's not visible but part of DOM
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+
+                textArea.focus();
+                textArea.select();
+
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+
+                if (successful) {
+                    setCopiedMessageId(messageId);
+                    setTimeout(() => setCopiedMessageId(null), 2000);
+                } else {
+                    console.error('Fallback copy failed.');
+                }
+            } catch (fallbackErr) {
+                console.error('Unable to copy', fallbackErr);
+            }
+        }
+    };
+
     const renderMessageContent = (content: string | undefined | null, role: string, messageId: string, messageMode?: string | null) => {
         // Safe fallback for empty/null content
         const safeContent = content || "";
@@ -222,7 +263,16 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         }
 
         return (
-            <div className="space-y-4">
+            <div className="space-y-4 relative group/message">
+                {effectiveMode === 'conversation' && (
+                    <button
+                        onClick={() => handleCopy(safeContent, messageId)}
+                        className="absolute -top-2 -right-2 p-1.5 rounded-lg bg-background/50 backdrop-blur-sm text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all opacity-0 group-hover/message:opacity-100 focus:opacity-100 shadow-sm border border-white/5 z-10"
+                        title="Antwort kopieren"
+                    >
+                        {copiedMessageId === messageId ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                    </button>
+                )}
                 {/* Introduction Text (if any) */}
                 {textBeforeJson && !(effectiveMode === 'todo' && !jsonArray) && (
                     <div className="prose prose-invert prose-sm max-w-none">
