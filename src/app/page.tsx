@@ -26,7 +26,7 @@ export default function DashboardPage() {
   if (loading) return null;
   if (!data.session) redirect("/login");
 
-  const { isAdmin, pendingUsersCount, activeProjects } = data;
+  const { isAdmin, pendingUsersCount, activeProjects, archivedProjects } = data;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -78,7 +78,8 @@ export default function DashboardPage() {
 
       <motion.div variants={itemVariants}>
         <ProjectDashboard
-          initialProjects={activeProjects}
+          activeProjects={activeProjects}
+          archivedProjects={archivedProjects}
           vapidPublicKey={data.vapidPublicKey || ""}
           isAdmin={isAdmin}
           pendingUsersCount={pendingUsersCount}

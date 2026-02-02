@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         console.log('Creates Debug: Received Body:', JSON.stringify(body, null, 2));
-        const { messages, projectContext, mode, referencedContext } = body;
+        const { messages, projectContext, mode, referencedContext, includeCompleted } = body;
 
         // Log API Key presence (safe)
         const rawApiKey = process.env.GOOGLE_GENERATION_AI_API_KEY;
@@ -55,7 +55,10 @@ Deine Aufgabe ist es, basierend auf der Nutzeranfrage und dem Kontext konkret um
 KONTEXT DES PROJEKTS:
 Titel: ${title}
 ${notes.length > 0 ? `Notizen:\n- ${notes.join('\n- ')}` : 'Keine Notizen vorhanden.'}
-${todos.length > 0 ? `Bestehende Aufgaben:\n- ${todos.map((t: { content: string }) => t.content).join('\n- ')}` : 'Keine Aufgaben vorhanden.'}
+${todos.length > 0 ? `Bestehende Aufgaben:\n- ${todos
+                    .filter((t: { isCompleted: boolean }) => includeCompleted ? true : !t.isCompleted)
+                    .map((t: { content: string, isCompleted: boolean }) => `${t.isCompleted ? '[ERLEDIGT] ' : ''}${t.content}`)
+                    .join('\n- ')}` : 'Keine Aufgaben vorhanden.'}
 
 ${referencedContext && referencedContext.length > 0 ? `SPEZIELLER KONTEXT (Vom Nutzer ausgewählt):\n${referencedContext.map((item: { type: string, title: string, content: string }) => `${item.type.toUpperCase()}: ${item.title}\nInhalt: ${item.content}`).join('\n\n')}` : ''}
 
@@ -73,7 +76,10 @@ Deine Rolle ist es, Ideen zu reflektieren, Impulse zu geben und dem Nutzer zu he
 KONTEXT DES PROJEKTS:
 Titel: ${title}
 ${notes.length > 0 ? `Notizen:\n- ${notes.join('\n- ')}` : 'Keine Notizen vorhanden.'}
-${todos.length > 0 ? `Offene Aufgaben:\n- ${todos.filter((t: { isCompleted: boolean }) => !t.isCompleted).map((t: { content: string }) => t.content).join('\n- ')}` : 'Keine offenen Aufgaben.'}
+${todos.length > 0 ? `${includeCompleted ? 'Alle Aufgaben' : 'Offene Aufgaben'}:\n- ${todos
+                    .filter((t: { isCompleted: boolean }) => includeCompleted ? true : !t.isCompleted)
+                    .map((t: { content: string, isCompleted: boolean }) => `${t.isCompleted ? '[ERLEDIGT] ' : ''}${t.content}`)
+                    .join('\n- ')}` : 'Keine Aufgaben.'}
 
 ${referencedContext && referencedContext.length > 0 ? `ZUSÄTZLICHER KONTEXT (Beziehe dich primär darauf):\n${referencedContext.map((item: { type: string, title: string, content: string }) => `${item.type.toUpperCase()}: ${item.title}\nInhalt: ${item.content}`).join('\n\n')}` : ''}
 

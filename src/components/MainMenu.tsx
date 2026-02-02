@@ -28,6 +28,8 @@ import PushManager from './PushManager';
 interface MainMenuProps {
     searchQuery: string;
     setSearchQuery: (query: string) => void;
+    searchArchive: boolean;
+    setSearchArchive: (val: boolean) => void;
     sortOption: string;
     setSortOption: (option: string) => void;
     vapidPublicKey: string;
@@ -39,6 +41,8 @@ interface MainMenuProps {
 export default function MainMenu({
     searchQuery,
     setSearchQuery,
+    searchArchive,
+    setSearchArchive,
     sortOption,
     setSortOption,
     vapidPublicKey,
@@ -54,7 +58,7 @@ export default function MainMenu({
     useEffect(() => {
         if (searchQuery.length > 1) {
             const timer = setTimeout(async () => {
-                const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+                const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&includeArchived=${searchArchive}`);
                 const data = await res.json();
                 setSearchResults(data.results || []);
             }, 300);
@@ -62,7 +66,7 @@ export default function MainMenu({
         } else {
             setSearchResults([]);
         }
-    }, [searchQuery]);
+    }, [searchQuery, searchArchive]);
 
     useEffect(() => setMounted(true), []);
 
@@ -148,6 +152,21 @@ export default function MainMenu({
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="w-full bg-foreground/5 border border-border rounded-2xl py-4 pl-14 pr-6 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
                                 />
+
+                                <div className="mt-3 flex items-center justify-end px-2">
+                                    <button
+                                        onClick={() => setSearchArchive(!searchArchive)}
+                                        className="flex items-center gap-2 group/toggle"
+                                    >
+                                        <span className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${searchArchive ? 'text-primary' : 'text-muted-foreground group-hover/toggle:text-foreground'}`}>
+                                            Archiv durchsuchen
+                                        </span>
+                                        <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${searchArchive ? 'bg-primary/20 border-primary/30' : 'bg-foreground/5 border-border'} border`}>
+                                            <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full transition-all duration-300 ${searchArchive ? 'right-0.5 bg-primary' : 'right-4 bg-muted-foreground'}`} />
+                                        </div>
+                                    </button>
+                                </div>
+
                                 <AnimatePresence>
                                     {searchResults.length > 0 && (
                                         <motion.div

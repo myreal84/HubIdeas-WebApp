@@ -43,6 +43,13 @@ export default function LoginForm({ allowCredentials = false }: LoginFormProps) 
         }
     };
 
+    const handleAutoFill = () => {
+        const stagingEmail = process.env.NEXT_PUBLIC_STAGING_ADMIN_EMAIL;
+        const stagingPassword = process.env.NEXT_PUBLIC_STAGING_ADMIN_PASSWORD;
+        if (stagingEmail) setEmail(stagingEmail);
+        if (stagingPassword) setPassword(stagingPassword);
+    };
+
     return (
         <div className="space-y-6">
             {allowCredentials ? (
@@ -53,7 +60,7 @@ export default function LoginForm({ allowCredentials = false }: LoginFormProps) 
                             placeholder="E-Mail"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/50 transition-all font-medium"
+                            className="w-full bg-accent/5 border border-border rounded-xl px-4 py-3 outline-none focus:border-primary/50 transition-all font-medium text-foreground placeholder:text-muted-foreground/50"
                             required
                         />
                     </div>
@@ -63,24 +70,33 @@ export default function LoginForm({ allowCredentials = false }: LoginFormProps) 
                             placeholder="Passwort"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-primary/50 transition-all font-medium"
+                            className="w-full bg-accent/5 border border-border rounded-xl px-4 py-3 outline-none focus:border-primary/50 transition-all font-medium text-foreground placeholder:text-muted-foreground/50"
                             required
                         />
                     </div>
+
+                    <button
+                        type="button"
+                        onClick={handleAutoFill}
+                        className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider w-full text-right"
+                    >
+                        Staging: Auto-fill Admin
+                    </button>
+
                     {error && <p className="text-red-400 text-xs font-bold">{error}</p>}
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-4 bg-primary text-white rounded-xl font-black uppercase tracking-widest hover:brightness-110 transition-all disabled:opacity-50"
+                        className="w-full py-4 bg-primary text-primary-foreground rounded-xl font-black uppercase tracking-widest hover:brightness-110 transition-all disabled:opacity-50 shadow-lg"
                     >
                         {loading ? "Lädt..." : "Anmelden"}
                     </button>
                     <div className="relative py-4">
                         <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-white/10"></div>
+                            <div className="w-full border-t border-border"></div>
                         </div>
                         <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-[#0f172a] px-2 text-slate-500 font-bold">Oder</span>
+                            <span className="bg-card px-2 text-muted-foreground font-bold">Oder</span>
                         </div>
                     </div>
                 </form>
@@ -118,11 +134,11 @@ export default function LoginForm({ allowCredentials = false }: LoginFormProps) 
                 )}
             </button>
 
-            <p className="text-[10px] text-center text-slate-500 uppercase tracking-widest font-bold opacity-50 mb-6">
+            <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest font-bold opacity-50 mb-6">
                 Sicheres Login via Google OAuth
             </p>
 
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-xs text-slate-400">
+            <div className="bg-accent/5 border border-border rounded-xl p-4 text-xs text-muted-foreground">
                 <strong>Hinweis zur Datensicherheit:</strong> Um dir intelligente Vorschläge und Chat-Funktionen zu bieten, werden deine Notizen verarbeitet. Deine Daten sind sicher gespeichert und für niemanden (auch nicht Administratoren) einsehbar, aber technisch bedingt nicht Ende-zu-Ende verschlüsselt, damit die KI damit arbeiten kann.
             </div>
         </div>

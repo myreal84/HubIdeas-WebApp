@@ -13,28 +13,47 @@ export async function GET() {
     const isAdmin = (session.user as any)?.role === "ADMIN";
     const pendingUsersCount = isAdmin ? await getPendingUsersCount() : 0;
 
-    const activeProjects = await prisma.project.findMany({
-        where: {
-            isArchived: false,
-            OR: [
-                { ownerId: session.user?.id },
-                { sharedWith: { some: { id: session.user?.id } } }
-            ]
-        },
-        orderBy: { updatedAt: "desc" },
-        include: {
-            _count: {
-                select: { todos: { where: { isCompleted: false } } }
+    const [activeProjects, archivedProjects] = await Promise.all([
+        prisma.project.findMany({
+            where: {
+                isArchived: false,
+                OR: [
+                    { ownerId: session.user?.id },
+                    { sharedWith: { some: { id: session.user?.id } } }
+                ]
             },
-            sharedWith: true,
-        }
-    });
+            orderBy: { updatedAt: "desc" },
+            include: {
+                _count: {
+                    select: { todos: { where: { isCompleted: false } } }
+                },
+                sharedWith: true,
+            }
+        }),
+        prisma.project.findMany({
+            where: {
+                isArchived: true,
+                OR: [
+                    { ownerId: session.user?.id },
+                    { sharedWith: { some: { id: session.user?.id } } }
+                ]
+            },
+            orderBy: { updatedAt: "desc" },
+            include: {
+                _count: {
+                    select: { todos: { where: { isCompleted: false } } }
+                },
+                sharedWith: true,
+            }
+        })
+    ]);
 
     return NextResponse.json({
         session,
         isAdmin,
         pendingUsersCount,
         activeProjects,
+        archivedProjects,
         vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""
     });
 }

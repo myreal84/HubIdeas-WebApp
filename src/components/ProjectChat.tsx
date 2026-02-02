@@ -25,6 +25,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
     const scrollRef = useRef<HTMLDivElement>(null);
     const [isAddingTodo, setIsAddingTodo] = useState(false);
     const [chatMode, setChatMode] = useState<'conversation' | 'todo'>('conversation');
+    const [includeCompleted, setIncludeCompleted] = useState(false);
     const [selectedItems, setSelectedItems] = useState<{ id: string; type: 'note' | 'todo'; title: string; content: string }[]>([]);
     const [isPickerOpen, setIsPickerOpen] = useState(false);
     const [adoptedTodoIndices, setAdoptedTodoIndices] = useState<Record<string, Set<number>>>({});
@@ -62,6 +63,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                 todos: project.todos.map(t => ({ content: t.content, isCompleted: t.isCompleted })),
             },
             mode: chatMode,
+            includeCompleted,
             referencedContext: selectedItems.length > 0 ? selectedItems.map(item => ({
                 title: item.title,
                 content: item.content,
@@ -92,6 +94,18 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
 
     const { messages, status, sendMessage, setMessages } = params as any; // Cast to any to bypass strict type checking for now
 
+    // EFFECT: Sync messages from props when project.chatMessages changes (e.g. navigation)
+    useEffect(() => {
+        if (project.chatMessages) {
+            setMessages(project.chatMessages.map(m => ({
+                id: m.id,
+                role: m.role as 'user' | 'assistant',
+                content: m.content,
+                mode: (m.mode || 'conversation') as 'conversation' | 'todo',
+            })));
+        }
+    }, [project.chatMessages, setMessages]);
+
     const isLoading = status === 'streaming' || status === 'submitted';
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -110,6 +124,10 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
 
         setInput(''); // Clear input immediately
 
+        // 1. Save USER message to DB first (await to ensure order)
+        await saveChatMessage(project.id, 'user', userContent, currentMode);
+
+        // 2. Trigger AI generation
         await sendMessage({ role: 'user', content: userContent }, {
             body: {
                 projectContext: {
@@ -118,6 +136,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                     todos: project.todos.map(t => ({ content: t.content, isCompleted: t.isCompleted })),
                 },
                 mode: currentMode,
+                includeCompleted,
                 referencedContext: selectedItems.length > 0 ? selectedItems.map(item => ({
                     title: item.title,
                     content: item.content,
@@ -126,9 +145,9 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
             }
         });
 
-        // User message persistence handled manually? 
-        // In previous code: saveChatMessage was called in onFormSubmit.
-        await saveChatMessage(project.id, 'user', userContent, currentMode);
+        // Manually update local messages for mode persistence if needed, 
+        // but sendMessage should add it to 'messages'. 
+        // We might need to map manual mode here.
 
         // Manually update local messages for mode persistence if needed, 
         // but sendMessage should add it to 'messages'. 
@@ -391,21 +410,32 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                     </div>
                 </div>
 
-                <div className="bg-foreground/5 p-1 rounded-2xl flex items-center gap-1 border border-border">
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={() => setChatMode('conversation')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${chatMode === 'conversation' ? 'bg-background shadow-lg text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => setIncludeCompleted(!includeCompleted)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${includeCompleted ? 'bg-primary/10 border-primary/30 text-primary shadow-sm' : 'bg-foreground/5 border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
+                        title={includeCompleted ? "Erledigte Aufgaben werden mit einbezogen" : "Nur offene Aufgaben werden an die KI gesendet"}
                     >
-                        <MessageSquare size={14} />
-                        Unterhaltung
+                        {includeCompleted ? <CheckSquare size={14} /> : <ListTodo size={14} className="opacity-50" />}
+                        <span>Erledigte</span>
                     </button>
-                    <button
-                        onClick={() => setChatMode('todo')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${chatMode === 'todo' ? 'bg-background shadow-lg text-accent' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                        <ListTodo size={14} />
-                        To-Do Generation
-                    </button>
+
+                    <div className="bg-foreground/5 p-1 rounded-2xl flex items-center gap-1 border border-border">
+                        <button
+                            onClick={() => setChatMode('conversation')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${chatMode === 'conversation' ? 'bg-background shadow-lg text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                        >
+                            <MessageSquare size={14} />
+                            Unterhaltung
+                        </button>
+                        <button
+                            onClick={() => setChatMode('todo')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${chatMode === 'todo' ? 'bg-background shadow-lg text-accent' : 'text-muted-foreground hover:text-foreground'}`}
+                        >
+                            <ListTodo size={14} />
+                            To-Do Generation
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -533,18 +563,20 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                                         {/* Todos Section */}
                                         <div className="mb-2">
                                             <p className="px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary mt-2 mb-1">Aufgaben</p>
-                                            {project.todos.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground italic">Keine Aufgaben</p>}
-                                            {project.todos.map(todo => (
-                                                <button
-                                                    key={todo.id}
-                                                    type="button"
-                                                    onClick={() => toggleItemSelection({ id: todo.id, type: 'todo', title: todo.content.substring(0, 20) + '...', content: todo.content })}
-                                                    className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-3 ${selectedItems.find(i => i.id === todo.id) ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-foreground/5 text-foreground'}`}
-                                                >
-                                                    <div className={`w-2 h-2 rounded-full ${selectedItems.find(i => i.id === todo.id) ? 'bg-primary' : 'bg-primary/20'}`} />
-                                                    <span className="truncate">{todo.content}</span>
-                                                </button>
-                                            ))}
+                                            {project.todos.filter(t => includeCompleted ? true : !t.isCompleted).length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground italic">Keine {includeCompleted ? 'Aufgaben' : 'offenen Aufgaben'}</p>}
+                                            {project.todos
+                                                .filter(t => includeCompleted ? true : !t.isCompleted)
+                                                .map(todo => (
+                                                    <button
+                                                        key={todo.id}
+                                                        type="button"
+                                                        onClick={() => toggleItemSelection({ id: todo.id, type: 'todo', title: todo.content.substring(0, 20) + '...', content: todo.content })}
+                                                        className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-3 ${selectedItems.find(i => i.id === todo.id) ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-foreground/5 text-foreground'}`}
+                                                    >
+                                                        <div className={`w-2 h-2 rounded-full ${selectedItems.find(i => i.id === todo.id) ? 'bg-primary' : 'bg-primary/20'} ${todo.isCompleted ? 'ring-1 ring-primary/40' : ''}`} />
+                                                        <span className={`truncate ${todo.isCompleted ? 'opacity-50 line-through' : ''}`}>{todo.content}</span>
+                                                    </button>
+                                                ))}
                                         </div>
                                     </div>
                                 </motion.div>

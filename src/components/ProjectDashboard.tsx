@@ -14,18 +14,20 @@ interface ProjectWithCount extends Project {
 }
 
 interface ProjectDashboardProps {
-    initialProjects: ProjectWithCount[];
+    activeProjects: ProjectWithCount[];
+    archivedProjects: ProjectWithCount[];
     vapidPublicKey: string;
     isAdmin?: boolean;
     pendingUsersCount?: number;
 }
 
-export default function ProjectDashboard({ initialProjects, vapidPublicKey, isAdmin, pendingUsersCount }: ProjectDashboardProps) {
+export default function ProjectDashboard({ activeProjects, archivedProjects, vapidPublicKey, isAdmin, pendingUsersCount }: ProjectDashboardProps) {
     const [searchQuery, setSearchQuery] = useState("");
+    const [searchArchive, setSearchArchive] = useState(false);
     const [sortOption, setSortOption] = useState("smart");
     const [randomSeed, setRandomSeed] = useState(0);
 
-    const activeCount = initialProjects.length;
+    const activeCount = activeProjects.length;
 
     // Shuffle helper
     const shuffle = (array: any[]) => { // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -45,7 +47,11 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey, isAd
     }, []);
 
     const filteredAndSorted = useMemo(() => {
-        const filtered = initialProjects.filter(p =>
+        const pool = searchArchive && searchQuery.length > 0
+            ? [...activeProjects, ...archivedProjects]
+            : activeProjects;
+
+        const filtered = pool.filter((p: ProjectWithCount) =>
             p.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
 
@@ -67,7 +73,7 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey, isAd
             const zone2: ProjectWithCount[] = []; // Reminded
             const zone3: ProjectWithCount[] = []; // Inspiration
 
-            filtered.forEach(p => {
+            filtered.forEach((p: ProjectWithCount) => {
                 const lastOpened = p.lastOpenedAt ? new Date(p.lastOpenedAt) : new Date(0);
                 const lastReminded = p.lastRemindedAt ? new Date(p.lastRemindedAt) : new Date(0);
 
@@ -92,7 +98,7 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey, isAd
 
         return { all: filtered };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [initialProjects, searchQuery, sortOption, randomSeed]);
+    }, [activeProjects, archivedProjects, searchQuery, sortOption, randomSeed, searchArchive]);
 
     const renderProjectCard = (project: ProjectWithCount, idx: number) => (
         <motion.div
@@ -131,6 +137,8 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey, isAd
             <MainMenu
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
+                searchArchive={searchArchive}
+                setSearchArchive={setSearchArchive}
                 sortOption={sortOption}
                 setSortOption={setSortOption}
                 vapidPublicKey={vapidPublicKey}
@@ -153,7 +161,7 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey, isAd
                             </div>
                             <motion.div className="responsive-grid" layout>
                                 <AnimatePresence mode="popLayout">
-                                    {filteredAndSorted.zone1!.map((p, i) => renderProjectCard(p, i))}
+                                    {filteredAndSorted.zone1!.map((p: ProjectWithCount, i: number) => renderProjectCard(p, i))}
                                 </AnimatePresence>
                             </motion.div>
                         </section>
@@ -171,7 +179,7 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey, isAd
                             </div>
                             <motion.div className="responsive-grid" layout>
                                 <AnimatePresence mode="popLayout">
-                                    {filteredAndSorted.zone2!.map((p, i) => renderProjectCard(p, i))}
+                                    {filteredAndSorted.zone2!.map((p: ProjectWithCount, i: number) => renderProjectCard(p, i))}
                                 </AnimatePresence>
                             </motion.div>
                         </section>
@@ -189,7 +197,7 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey, isAd
                             </div>
                             <motion.div className="responsive-grid" layout>
                                 <AnimatePresence mode="popLayout">
-                                    {filteredAndSorted.zone3!.map((p, i) => renderProjectCard(p, i))}
+                                    {filteredAndSorted.zone3!.map((p: ProjectWithCount, i: number) => renderProjectCard(p, i))}
                                 </AnimatePresence>
                             </motion.div>
                         </section>
@@ -210,7 +218,7 @@ export default function ProjectDashboard({ initialProjects, vapidPublicKey, isAd
                     {filteredAndSorted.all?.length === 0 ? <EmptyState /> : (
                         <motion.div className="responsive-grid" layout>
                             <AnimatePresence mode="popLayout">
-                                {filteredAndSorted.all!.map((p, i) => renderProjectCard(p, i))}
+                                {filteredAndSorted.all!.map((p: ProjectWithCount, i: number) => renderProjectCard(p, i))}
                             </AnimatePresence>
                         </motion.div>
                     )}
