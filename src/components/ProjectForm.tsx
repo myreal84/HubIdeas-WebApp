@@ -25,6 +25,9 @@ export default function ProjectForm({ onProjectCreated }: { onProjectCreated?: (
         e.preventDefault();
         if (!name.trim() || loading) return;
 
+        // Reset state for new project
+        setAddedIndices(new Set());
+
         setLoading(true);
         try {
             const project = await createProject(name, note);
