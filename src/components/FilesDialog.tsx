@@ -49,8 +49,8 @@ export default function FilesDialog({ projectId, isOpen, onClose }: FilesDialogP
         try {
             await deleteFile(id);
             setFiles(prev => prev.filter(f => f.id !== id));
-        } catch (error) {
-            alert("Fehler beim Löschen");
+        } catch (error: any) {
+            alert(`Fehler beim Löschen: ${error.message}`);
         }
     };
 
@@ -113,7 +113,7 @@ export default function FilesDialog({ projectId, isOpen, onClose }: FilesDialogP
                                         </div>
                                         <button
                                             onClick={() => handleDelete(file.id)}
-                                            className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                            className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors group-hover:opacity-100"
                                             title="Löschen"
                                         >
                                             <Trash2 size={16} />

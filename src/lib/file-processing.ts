@@ -3,17 +3,33 @@ import mammoth from 'mammoth';
 export async function extractTextFromFile(buffer: Buffer, mimeType: string, originalName: string): Promise<string> {
     try {
         if (mimeType === 'application/pdf') {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const pdfModule = require('pdf-parse');
-            // Check for various export styles (default vs named vs direct)
-            const parseFunc = typeof pdfModule === 'function' ? pdfModule : (pdfModule.default || pdfModule.PDFParse);
+            return new Promise((resolve, reject) => {
+                try {
+                    // eslint-disable-next-line @typescript-eslint/no-var-requires
+                    const PDFParser = require('pdf2json');
+                    const pdfParser = new PDFParser(null, 1); // 1 = text only
 
-            if (typeof parseFunc !== 'function') {
-                throw new Error('PDF parsing library could not be loaded correctly.');
-            }
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    pdfParser.on("pdfParser_dataError", (errData: any) => {
+                        console.error("PDF Parser Error:", errData.parserError);
+                        reject(new Error(errData.parserError));
+                    });
 
-            const data = await parseFunc(buffer);
-            return `--- START PDF: ${originalName} ---\n${data.text}\n--- END PDF ---`;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    pdfParser.on("pdfParser_dataReady", () => {
+                        try {
+                            const text = pdfParser.getRawTextContent();
+                            resolve(`--- START PDF: ${originalName} ---\n${text}\n--- END PDF ---`);
+                        } catch (e) {
+                            reject(e);
+                        }
+                    });
+
+                    pdfParser.parseBuffer(buffer);
+                } catch (e) {
+                    reject(e);
+                }
+            });
         }
 
         if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {

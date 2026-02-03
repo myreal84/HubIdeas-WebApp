@@ -135,7 +135,6 @@ export async function POST(req: Request) {
                 }
 
                 lastMsg.content = newContent;
-            } else {
                 // Fallback if no user message found (e.g. empty history?)
                 messages.unshift({
                     role: 'user',

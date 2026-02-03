@@ -27,7 +27,14 @@ export async function GET() {
                 _count: {
                     select: { todos: { where: { isCompleted: false } } }
                 },
-                sharedWith: true,
+                sharedWith: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        image: true
+                    }
+                },
             }
         }),
         prisma.project.findMany({
@@ -43,7 +50,14 @@ export async function GET() {
                 _count: {
                     select: { todos: { where: { isCompleted: false } } }
                 },
-                sharedWith: true,
+                sharedWith: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        image: true
+                    }
+                },
             }
         }),
         prisma.user.findUnique({
