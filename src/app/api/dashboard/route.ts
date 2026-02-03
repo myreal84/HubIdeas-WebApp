@@ -13,7 +13,7 @@ export async function GET() {
     const isAdmin = (session.user as any)?.role === "ADMIN";
     const pendingUsersCount = isAdmin ? await getPendingUsersCount() : 0;
 
-    const [activeProjects, archivedProjects] = await Promise.all([
+    const [activeProjects, archivedProjects, userData] = await Promise.all([
         prisma.project.findMany({
             where: {
                 isArchived: false,
@@ -45,6 +45,10 @@ export async function GET() {
                 },
                 sharedWith: true,
             }
+        }),
+        prisma.user.findUnique({
+            where: { id: session.user?.id },
+            select: { storageLimit: true, storageUsed: true }
         })
     ]);
 
@@ -54,6 +58,12 @@ export async function GET() {
         pendingUsersCount,
         activeProjects,
         archivedProjects,
+        storageUsage: {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            limit: (userData as any)?.storageLimit?.toString() || "104857600",
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            used: (userData as any)?.storageUsed?.toString() || "0"
+        },
         vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""
     });
 }

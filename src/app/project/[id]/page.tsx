@@ -41,11 +41,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 }
             },
             todos: {
-                orderBy: { createdAt: "desc" },
+                orderBy: [
+                    { isCompleted: "asc" },
+                    { order: "asc" },
+                    { createdAt: "desc" }
+                ],
                 include: { creator: { select: { name: true } } }
             },
             notes: {
-                orderBy: { createdAt: "desc" },
+                orderBy: { order: "asc" },
                 include: { creator: { select: { name: true } } }
             },
             chatMessages: { orderBy: { createdAt: "asc" } },

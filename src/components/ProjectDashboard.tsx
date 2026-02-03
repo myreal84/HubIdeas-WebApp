@@ -19,9 +19,10 @@ interface ProjectDashboardProps {
     vapidPublicKey: string;
     isAdmin?: boolean;
     pendingUsersCount?: number;
+    storageUsage?: { limit: string, used: string };
 }
 
-export default function ProjectDashboard({ activeProjects, archivedProjects, vapidPublicKey, isAdmin, pendingUsersCount }: ProjectDashboardProps) {
+export default function ProjectDashboard({ activeProjects, archivedProjects, vapidPublicKey, isAdmin, pendingUsersCount, storageUsage }: ProjectDashboardProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchArchive, setSearchArchive] = useState(false);
     const [sortOption, setSortOption] = useState("smart");
@@ -145,6 +146,7 @@ export default function ProjectDashboard({ activeProjects, archivedProjects, vap
                 activeCount={activeCount}
                 isAdmin={isAdmin}
                 pendingUsersCount={pendingUsersCount}
+                storageUsage={storageUsage}
             />
 
             {sortOption === 'smart' ? (

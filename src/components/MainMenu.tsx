@@ -36,6 +36,7 @@ interface MainMenuProps {
     activeCount: number;
     isAdmin?: boolean;
     pendingUsersCount?: number;
+    storageUsage?: { limit: string, used: string };
 }
 
 export default function MainMenu({
@@ -48,7 +49,8 @@ export default function MainMenu({
     vapidPublicKey,
     activeCount,
     isAdmin,
-    pendingUsersCount = 0
+    pendingUsersCount = 0,
+    storageUsage
 }: MainMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -274,6 +276,27 @@ export default function MainMenu({
                             <label className="block text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Erinnerungen</label>
                             <PushManager vapidPublicKey={vapidPublicKey} />
                         </div>
+
+                        {/* Storage Section */}
+                        {storageUsage && (
+                            <div className="mb-12">
+                                <label className="block text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Speicherplatz</label>
+                                <div className="p-4 bg-foreground/5 border border-border rounded-2xl">
+                                    <div className="flex justify-between items-end mb-2">
+                                        <span className="font-bold text-sm">Belegt</span>
+                                        <span className="text-xs font-medium text-muted-foreground">
+                                            {(parseInt(storageUsage.used) / 1024 / 1024).toFixed(1)} MB / {(parseInt(storageUsage.limit) / 1024 / 1024).toFixed(0)} MB
+                                        </span>
+                                    </div>
+                                    <div className="h-2 w-full bg-background rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-primary rounded-full transition-all duration-1000"
+                                            style={{ width: `${Math.min((parseInt(storageUsage.used) / parseInt(storageUsage.limit)) * 100, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Account Section */}
                         <div className="mt-auto pt-12 border-t border-border">

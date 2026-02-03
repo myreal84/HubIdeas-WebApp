@@ -83,6 +83,8 @@ export default function DashboardPage() {
           vapidPublicKey={data.vapidPublicKey || ""}
           isAdmin={isAdmin}
           pendingUsersCount={pendingUsersCount}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          storageUsage={(data as any).storageUsage}
         />
       </motion.div>
     </motion.div>

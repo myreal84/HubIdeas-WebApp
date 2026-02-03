@@ -58,6 +58,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         })),
         body: {
             projectContext: {
+                id: project.id,
                 title: project.name,
                 notes: project.notes.map(n => n.content),
                 todos: project.todos.map(t => ({ content: t.content, isCompleted: t.isCompleted })),
@@ -131,6 +132,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         await sendMessage({ role: 'user', content: userContent }, {
             body: {
                 projectContext: {
+                    id: project.id,
                     title: project.name,
                     notes: project.notes.map(n => n.content),
                     todos: project.todos.map(t => ({ content: t.content, isCompleted: t.isCompleted })),

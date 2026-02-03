@@ -3,6 +3,11 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { auth } from '@/auth';
 import { NextResponse } from 'next/server';
 import { checkAndResetAiLimit, recordAiUsage } from '@/lib/ai-limits';
+import { prisma } from '@/lib/prisma';
+import { decryptBuffer } from '@/lib/encryption';
+import { extractTextFromFile } from '@/lib/file-processing';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const DEFAULT_MODEL = 'gemini-2.0-flash-lite';
 
@@ -21,19 +26,25 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        console.log('Creates Debug: Received Body:', JSON.stringify(body, null, 2));
-        const { messages, projectContext, mode, referencedContext, includeCompleted } = body;
+        const { projectContext, mode, referencedContext, includeCompleted } = body;
+        let { messages } = body;
 
-        // Log API Key presence (safe)
-        const rawApiKey = process.env.GOOGLE_GENERATION_AI_API_KEY;
-        console.log(`[API] Google Key present: ${!!rawApiKey}, Length: ${rawApiKey?.length || 0}, Preview: ${rawApiKey ? rawApiKey.substring(0, 5) + '...' : 'N/A'}`);
+        // Sanitize messages: Remove empty messages to prevent API errors (e.g. from previous failed turns)
+        if (Array.isArray(messages)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            messages = messages.filter((m: any) => {
+                if (!m.content) return false;
+                if (typeof m.content === 'string' && m.content.trim() === '') return false;
+                if (Array.isArray(m.content) && m.content.length === 0) return false;
+                return true;
+            });
+        }
 
         if (!projectContext) {
-            console.error('Creates Debug: projectContext is missing in body!');
             return NextResponse.json({ error: 'projectContext is required' }, { status: 400 });
         }
 
-        const { title, notes, todos } = projectContext;
+        const { id: projectId, title, notes, todos } = projectContext;
 
         // Check AI Limit
         const { canUse } = await checkAndResetAiLimit(session.user.id);
@@ -42,6 +53,95 @@ export async function POST(req: Request) {
                 error: 'AI Limit reached',
                 message: 'Du hast dein monatliches Token-Limit erreicht. Bitte kontaktiere einen Admin.'
             }, { status: 429 });
+        }
+
+        // Fetch and process files if projectId exists
+        let contextParts: any[] = []; // Using any[] to allow flexible CoreMessage parts
+
+        if (projectId) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const files = await (prisma as any).projectFile.findMany({
+                where: { projectId },
+                orderBy: { createdAt: 'desc' }
+            });
+
+            if (files.length > 0) {
+                console.log(`Found ${files.length} files for project ${projectId}`);
+
+                for (const file of files) {
+                    try {
+                        if (!file.content) {
+                            console.warn(`File ${file.name} has no content.`);
+                            continue;
+                        }
+
+                        // Decrypt
+                        const decryptedBuffer = decryptBuffer(file.content, file.iv);
+
+                        if (file.type.startsWith('image/')) {
+                            console.log(`Processing image: ${file.name} (${file.type})`);
+                            // Convert to Base64
+                            const base64Image = decryptedBuffer.toString('base64');
+                            contextParts.push({
+                                type: 'image',
+                                image: base64Image,
+                                mimeType: file.type // Pass mimeType for clarity
+                            });
+                            // Add a label for the image
+                            contextParts.push({
+                                type: 'text',
+                                text: `[Bildanhang: ${file.name}]`
+                            });
+                        } else {
+                            console.log(`Processing text/safe file: ${file.name} (${file.type})`);
+                            // Extract Text
+                            const text = await extractTextFromFile(decryptedBuffer, file.type, file.name);
+                            contextParts.push({
+                                type: 'text',
+                                text: text
+                            });
+                        }
+                    } catch (e) {
+                        console.error(`Error processing file ${file.name}:`, e);
+                        contextParts.push({
+                            type: 'text',
+                            text: `[Fehler beim Verarbeiten der Datei ${file.name}: ${(e as Error).message}]`
+                        });
+                    }
+                }
+            }
+        }
+
+        // Inject File Context into Messages
+        if (contextParts.length > 0) {
+            console.log('Injecting file context into conversation.');
+            // Prepend explanation
+            contextParts.unshift({
+                type: 'text',
+                text: 'DATEIANHÄNGE (Die folgenden Inhalte gehören zum Projektkontext):'
+            });
+
+            // Merge into the last user message to avoid multiple User messages in a row (Gemini strictness)
+            const lastMsg = messages[messages.length - 1];
+
+            if (lastMsg && lastMsg.role === 'user') {
+                const originalContent = lastMsg.content;
+                let newContent = [...contextParts];
+
+                if (typeof originalContent === 'string') {
+                    newContent.push({ type: 'text', text: originalContent });
+                } else if (Array.isArray(originalContent)) {
+                    newContent.push(...originalContent);
+                }
+
+                lastMsg.content = newContent;
+            } else {
+                // Fallback if no user message found (e.g. empty history?)
+                messages.unshift({
+                    role: 'user',
+                    content: contextParts
+                });
+            }
         }
 
         const googleProvider = getGoogleProvider();

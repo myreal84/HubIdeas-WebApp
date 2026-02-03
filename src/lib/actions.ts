@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import crypto from 'crypto';
 
 // --- Helpers ---
 
@@ -192,6 +193,7 @@ export async function getTodos(projectId: string) {
         where: { projectId },
         orderBy: [
             { isCompleted: "asc" },
+            { order: "asc" },
             { createdAt: "desc" }
         ],
     });
@@ -201,9 +203,19 @@ export async function addTodo(projectId: string, content: string) {
     const userId = await getRequiredUserId();
     await checkProjectAccess(projectId, userId);
 
+    // Get minimum order to insert at top
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const firstTodo = await (prisma.todo as any).findFirst({
+        where: { projectId },
+        orderBy: { order: 'asc' },
+        select: { order: true }
+    });
+
+    const newOrder = firstTodo ? firstTodo.order - 1 : 0;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const todo = await (prisma.todo as any).create({
-        data: { content, projectId, creatorId: userId },
+        data: { content, projectId, creatorId: userId, order: newOrder },
     });
     revalidatePath("/");
     revalidatePath(`/project/${projectId}`);
@@ -262,6 +274,23 @@ export async function updateTodo(id: string, content: string) {
     revalidatePath(`/project/${todo.projectId}`);
 }
 
+export async function reorderTodo(id: string, newOrder: number) {
+    const userId = await getRequiredUserId();
+    const todo = await prisma.todo.findUnique({
+        where: { id },
+        include: { project: true }
+    });
+
+    if (!todo) throw new Error("Aufgabe nicht gefunden");
+    await checkProjectAccess(todo.projectId, userId);
+
+    await prisma.todo.update({
+        where: { id },
+        data: { order: newOrder },
+    });
+    revalidatePath(`/project/${todo.projectId}`);
+}
+
 // --- Note Actions ---
 
 export async function getNotes(projectId: string) {
@@ -270,7 +299,7 @@ export async function getNotes(projectId: string) {
 
     return await prisma.note.findMany({
         where: { projectId },
-        orderBy: { createdAt: "desc" },
+        orderBy: { order: "asc" },
     });
 }
 
@@ -278,9 +307,19 @@ export async function addNote(projectId: string, content: string) {
     const userId = await getRequiredUserId();
     await checkProjectAccess(projectId, userId);
 
+    // Get minimum order to insert at top
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const firstNote = await (prisma.note as any).findFirst({
+        where: { projectId },
+        orderBy: { order: 'asc' },
+        select: { order: true }
+    });
+
+    const newOrder = firstNote ? firstNote.order - 1 : 0;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const note = await (prisma.note as any).create({
-        data: { content, projectId, creatorId: userId },
+        data: { content, projectId, creatorId: userId, order: newOrder },
     });
     revalidatePath("/");
     return note;
@@ -317,6 +356,23 @@ export async function updateNote(id: string, content: string) {
         data: { content },
     });
     revalidatePath("/");
+    revalidatePath(`/project/${note.projectId}`);
+}
+
+export async function reorderNote(id: string, newOrder: number) {
+    const userId = await getRequiredUserId();
+    const note = await prisma.note.findUnique({
+        where: { id },
+        include: { project: true }
+    });
+
+    if (!note) throw new Error("Notiz nicht gefunden");
+    await checkProjectAccess(note.projectId, userId);
+
+    await prisma.note.update({
+        where: { id },
+        data: { order: newOrder },
+    });
     revalidatePath(`/project/${note.projectId}`);
 }
 
@@ -415,6 +471,115 @@ export async function getShareableUsers() {
     });
 }
 
+
+import { encryptBuffer } from "@/lib/encryption";
+// ... existing imports
+
+// --- File Actions ---
+
+export async function uploadFile(projectId: string, formData: FormData) {
+    const userId = await getRequiredUserId();
+    await checkProjectAccess(projectId, userId);
+
+    const file = formData.get("file") as File;
+    if (!file) throw new Error("Keine Datei ausgewählt");
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const size = buffer.length;
+
+    // Check User Storage Limit
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const user = await (prisma.user as any).findUnique({
+        where: { id: userId },
+        select: { storageLimit: true, storageUsed: true }
+    });
+
+    if (user.storageUsed + BigInt(size) > user.storageLimit) {
+        throw new Error("Speicherplatzlimit überschritten.");
+    }
+
+    // Encrypt
+    const { encryptedData, iv } = encryptBuffer(buffer);
+
+    // Save to DB
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (prisma.projectFile as any).create({
+        data: {
+            name: file.name,
+            type: file.type,
+            size: size,
+            content: encryptedData,
+            iv: iv,
+            projectId: projectId,
+            uploaderId: userId
+        }
+    });
+
+    // Update Usage
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (prisma.user as any).update({
+        where: { id: userId },
+        data: { storageUsed: { increment: size } }
+    });
+
+    revalidatePath(`/project/${projectId}`);
+}
+
+export async function getProjectFiles(projectId: string) {
+    const userId = await getRequiredUserId();
+    await checkProjectAccess(projectId, userId);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (prisma.projectFile as any).findMany({
+        where: { projectId },
+        orderBy: { createdAt: 'desc' },
+        include: { uploader: { select: { name: true } } }
+    });
+}
+
+export async function deleteFile(fileId: string) {
+    const userId = await getRequiredUserId();
+
+    // Check permission (uploader or admin or project owner?)
+    // For now, allow if can access project and is uploader or admin.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const file = await (prisma.projectFile as any).findUnique({
+        where: { id: fileId },
+        include: { project: true }
+    });
+
+    if (!file) throw new Error("Datei nicht gefunden");
+    await checkProjectAccess(file.projectId, userId);
+
+    const user = await auth().then(s => s?.user);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isAdmin = (user as any)?.role === 'ADMIN';
+
+    if (file.uploaderId !== userId && !isAdmin) {
+        // Also allow project owner
+        if (file.project.ownerId !== userId) {
+            throw new Error("Keine Berechtigung zum Löschen dieser Datei.");
+        }
+    }
+
+    // Delete from DB
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (prisma.projectFile as any).delete({
+        where: { id: fileId }
+    });
+
+    // Update Usage (decrement)
+    if (file.uploaderId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (prisma.user as any).update({
+            where: { id: file.uploaderId },
+            data: { storageUsed: { decrement: file.size } }
+        });
+    }
+
+    revalidatePath(`/project/${file.projectId}`);
+}
+
 export async function getPendingUsersCount() {
     try {
         await checkAdmin();
@@ -426,3 +591,4 @@ export async function getPendingUsersCount() {
         return 0;
     }
 }
+

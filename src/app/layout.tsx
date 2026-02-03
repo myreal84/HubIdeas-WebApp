@@ -42,7 +42,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className={`${inter.variable} ${outfit.variable}`} suppressHydrationWarning>
-      <body className="antialiased">
+      <body
+        className="antialiased"
+        data-env={process.env.NEXT_PUBLIC_IS_STAGING === 'true' ? 'staging' : undefined}
+      >
         <AuthProvider>
           <ThemeProvider
             attribute="data-theme"
