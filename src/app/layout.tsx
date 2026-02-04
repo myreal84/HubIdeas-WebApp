@@ -34,6 +34,7 @@ export const metadata: Metadata = {
 
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/components/AuthProvider";
+import ServiceWorkerProvider from "@/components/ServiceWorkerProvider";
 
 export default function RootLayout({
   children,
@@ -42,19 +43,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className={`${inter.variable} ${outfit.variable}`} suppressHydrationWarning>
-      <body className="antialiased">
-        <AuthProvider>
-          <ThemeProvider
-            attribute="data-theme"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <main className="min-h-screen">
-              {children}
-            </main>
-          </ThemeProvider>
-        </AuthProvider>
+      <body
+        className="antialiased"
+        data-env={process.env.NEXT_PUBLIC_IS_STAGING === 'true' ? 'staging' : undefined}
+      >
+        <ServiceWorkerProvider>
+          <AuthProvider>
+            <ThemeProvider
+              attribute="data-theme"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <main className="min-h-screen">
+                {children}
+              </main>
+            </ThemeProvider>
+          </AuthProvider>
+        </ServiceWorkerProvider>
       </body>
     </html>
   );

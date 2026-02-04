@@ -33,6 +33,7 @@ export type Todo = {
     id: string;
     content: string;
     isCompleted: boolean;
+    order: number;
     projectId: string;
     createdAt: Date;
     creator?: {
@@ -43,6 +44,7 @@ export type Todo = {
 export type Note = {
     id: string;
     content: string;
+    order: number;
     projectId: string;
     createdAt: Date;
     creator?: {

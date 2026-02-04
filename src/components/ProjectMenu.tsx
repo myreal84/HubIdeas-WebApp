@@ -29,6 +29,7 @@ interface ProjectMenuProps {
     onOpenChat?: () => void;
     isAdmin?: boolean;
     pendingUsersCount?: number;
+    disableChat?: boolean;
 }
 
 export default function ProjectMenu({
@@ -37,7 +38,8 @@ export default function ProjectMenu({
     isArchived,
     onOpenChat,
     isAdmin,
-    pendingUsersCount = 0
+    pendingUsersCount = 0,
+    disableChat = false
 }: ProjectMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const { theme, setTheme } = useTheme();
@@ -129,13 +131,23 @@ export default function ProjectMenu({
                                 {!isArchived && onOpenChat && (
                                     <button
                                         onClick={() => {
-                                            onOpenChat();
-                                            setIsOpen(false);
+                                            if (!disableChat) {
+                                                onOpenChat();
+                                                setIsOpen(false);
+                                            }
                                         }}
-                                        className="w-full flex items-center justify-center gap-3 p-5 rounded-2xl text-sm font-bold uppercase tracking-widest transition-all shadow-xl group bg-gradient-to-br from-primary to-accent text-white hover:brightness-110"
+                                        disabled={disableChat}
+                                        className={`w-full flex items-center justify-center gap-3 p-5 rounded-2xl text-sm font-bold uppercase tracking-widest transition-all shadow-xl group ${disableChat
+                                            ? 'bg-foreground/10 text-muted-foreground cursor-not-allowed border border-transparent opacity-70'
+                                            : 'bg-gradient-to-br from-primary to-accent text-white hover:brightness-110'
+                                            }`}
                                     >
-                                        <Sparkles className="w-5 h-5 animate-pulse" />
-                                        <span>Chat Assistent</span>
+                                        {disableChat ? (
+                                            <Sparkles className="w-5 h-5 opacity-50" />
+                                        ) : (
+                                            <Sparkles className="w-5 h-5 animate-pulse" />
+                                        )}
+                                        <span>{disableChat ? 'Limit Erreicht' : 'Chat Assistent'}</span>
                                     </button>
                                 )}
                                 <button

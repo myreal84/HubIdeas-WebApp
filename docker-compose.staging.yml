@@ -6,6 +6,7 @@ services:
         - NEXT_PUBLIC_STAGING_ADMIN_EMAIL
         - NEXT_PUBLIC_STAGING_ADMIN_PASSWORD
         - NEXT_PUBLIC_ALLOW_CREDENTIALS
+        - NEXT_PUBLIC_IS_STAGING=true
     container_name: hub-ideas
     ports:
       - "3001:3000"

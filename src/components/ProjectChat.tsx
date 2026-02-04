@@ -2,9 +2,9 @@
 
 import { useChat } from '@ai-sdk/react';
 import { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot, Plus, MessageSquare, ListTodo, Paperclip, X, Loader2, CheckSquare, Copy, Check } from 'lucide-react';
+import { Send, User, Bot, Plus, MessageSquare, ListTodo, Paperclip, X, Loader2, CheckSquare, Copy, Check, FileText, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { Project } from '@/lib/types';
-import { saveChatMessage, addTodo } from '@/lib/actions';
+import { saveChatMessage, addTodo, getProjectFiles } from '@/lib/actions';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 
@@ -26,9 +26,13 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
     const [isAddingTodo, setIsAddingTodo] = useState(false);
     const [chatMode, setChatMode] = useState<'conversation' | 'todo'>('conversation');
     const [includeCompleted, setIncludeCompleted] = useState(false);
-    const [selectedItems, setSelectedItems] = useState<{ id: string; type: 'note' | 'todo'; title: string; content: string }[]>([]);
+    const [selectedItems, setSelectedItems] = useState<{ id: string; type: 'note' | 'todo' | 'file'; title: string; content?: string }[]>([]);
     const [isPickerOpen, setIsPickerOpen] = useState(false);
     const [adoptedTodoIndices, setAdoptedTodoIndices] = useState<Record<string, Set<number>>>({});
+    const [availableFiles, setAvailableFiles] = useState<any[]>([]);
+
+    const isLimitReached = aiTokensUsed >= aiTokenLimit;
+
     // Shadow state to track modes of messages locally, ensuring persistence across re-renders/mode switches
     const [messageModes, setMessageModes] = useState<Record<string, 'conversation' | 'todo'>>(() => {
         const modes: Record<string, 'conversation' | 'todo'> = {};
@@ -45,6 +49,13 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         chatModeRef.current = chatMode;
     }, [chatMode]);
 
+    // Fetch files when picker is opened
+    useEffect(() => {
+        if (isPickerOpen && availableFiles.length === 0) {
+            getProjectFiles(project.id).then(files => setAvailableFiles(files));
+        }
+    }, [isPickerOpen, project.id, availableFiles.length]);
+
     const [input, setInput] = useState('');
     const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
@@ -58,17 +69,19 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         })),
         body: {
             projectContext: {
+                id: project.id,
                 title: project.name,
                 notes: project.notes.map(n => n.content),
                 todos: project.todos.map(t => ({ content: t.content, isCompleted: t.isCompleted })),
             },
             mode: chatMode,
             includeCompleted,
-            referencedContext: selectedItems.length > 0 ? selectedItems.map(item => ({
+            referencedContext: selectedItems.filter(i => i.type !== 'file').map(item => ({
                 title: item.title,
                 content: item.content,
                 type: item.type
-            })) : undefined
+            })),
+            selectedFileIds: selectedItems.filter(i => i.type === 'file').map(i => i.id)
         },
         onFinish: async ({ message }: { message: any }) => {
             // In newer SDK versions, content might be empty but parts holds the text
@@ -131,17 +144,19 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         await sendMessage({ role: 'user', content: userContent }, {
             body: {
                 projectContext: {
+                    id: project.id,
                     title: project.name,
                     notes: project.notes.map(n => n.content),
                     todos: project.todos.map(t => ({ content: t.content, isCompleted: t.isCompleted })),
                 },
                 mode: currentMode,
                 includeCompleted,
-                referencedContext: selectedItems.length > 0 ? selectedItems.map(item => ({
+                referencedContext: selectedItems.filter(i => i.type !== 'file').map(item => ({
                     title: item.title,
                     content: item.content,
                     type: item.type
-                })) : undefined
+                })),
+                selectedFileIds: selectedItems.filter(i => i.type === 'file').map(i => i.id)
             }
         });
 
@@ -194,7 +209,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
         setIsAddingTodo(false);
     };
 
-    const toggleItemSelection = (item: { id: string; type: 'note' | 'todo'; title: string; content: string }) => {
+    const toggleItemSelection = (item: { id: string; type: 'note' | 'todo' | 'file'; title: string; content?: string }) => {
         setSelectedItems(prev => {
             const exists = prev.find(i => i.id === item.id);
             if (exists) return prev.filter(i => i.id !== item.id);
@@ -496,6 +511,22 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
             <div className="p-3 lg:p-4 pb-24 lg:pb-8 bg-background/80 border-t border-border backdrop-blur-3xl pb-safe space-y-3">
                 {/* Context Chips */}
                 <AnimatePresence>
+                    {aiTokensUsed >= aiTokenLimit && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-2 flex items-center gap-3"
+                        >
+                            <div className="p-1.5 bg-red-500/20 rounded-full text-red-500">
+                                <Sparkles size={14} />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-xs font-bold text-red-500">Token-Limit erreicht.</p>
+                                <p className="text-[10px] text-red-500/80">Du kannst erst im nächsten Zyklus wieder Nachrichten senden.</p>
+                            </div>
+                        </motion.div>
+                    )}
                     {selectedItems.length > 0 && (
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
@@ -509,8 +540,8 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                                     layout
                                     className="flex items-center gap-2 bg-accent/10 border border-accent/20 text-accent px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest"
                                 >
-                                    <span className="opacity-50">{item.type === 'note' ? 'Notiz:' : 'Todo:'}</span>
-                                    <span>{item.title}</span>
+                                    <span className="opacity-50">{item.type === 'note' ? 'Notiz:' : item.type === 'todo' ? 'Todo:' : 'Datei:'}</span>
+                                    <span className="max-w-[100px] truncate">{item.title}</span>
                                     <button onClick={() => toggleItemSelection(item)} className="hover:text-foreground">
                                         <X size={12} />
                                     </button>
@@ -525,8 +556,9 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                     <div className="relative" ref={pickerRef}>
                         <button
                             type="button"
-                            onClick={() => setIsPickerOpen(!isPickerOpen)}
-                            className={`p-4 rounded-xl border transition-all shadow-lg ${isPickerOpen ? 'bg-primary text-white border-primary' : 'bg-card border-border text-muted-foreground hover:border-primary/50'}`}
+                            onClick={() => !isLimitReached && setIsPickerOpen(!isPickerOpen)}
+                            disabled={isLimitReached}
+                            className={`p-4 rounded-xl border transition-all shadow-lg ${isPickerOpen ? 'bg-primary text-white border-primary' : 'bg-card border-border text-muted-foreground hover:border-primary/50'} ${isLimitReached ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title="Kontext hinzufügen"
                         >
                             <Paperclip size={20} className={isPickerOpen ? 'rotate-45 transition-transform' : ''} />
@@ -544,6 +576,23 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                                         <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Kontext auswählen</h4>
                                     </div>
                                     <div className="max-h-64 overflow-y-auto custom-scrollbar p-2">
+                                        {/* Files Section */}
+                                        <div className="mb-2">
+                                            <p className="px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-foreground mt-2 mb-1">Dateien</p>
+                                            {availableFiles.length === 0 && <p className="px-3 py-2 text-xs text-muted-foreground italic">Keine Dateien verfügbar.</p>}
+                                            {availableFiles.map((file: any) => (
+                                                <button
+                                                    key={file.id}
+                                                    type="button"
+                                                    disabled={isLimitReached}
+                                                    onClick={() => toggleItemSelection({ id: file.id, type: 'file', title: file.name })}
+                                                    className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-3 ${selectedItems.find(i => i.id === file.id) ? 'bg-foreground/10 text-foreground font-bold' : 'hover:bg-foreground/5 text-foreground'}`}
+                                                >
+                                                    <div className={`w-2 h-2 rounded-full ${selectedItems.find(i => i.id === file.id) ? 'bg-foreground' : 'bg-foreground/20'}`} />
+                                                    <span className="truncate">{file.name}</span>
+                                                </button>
+                                            ))}
+                                        </div>
                                         {/* Notes Section */}
                                         <div className="mb-2">
                                             <p className="px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-accent mt-2 mb-1">Notizen</p>
@@ -552,6 +601,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                                                 <button
                                                     key={note.id}
                                                     type="button"
+                                                    disabled={isLimitReached}
                                                     onClick={() => toggleItemSelection({ id: note.id, type: 'note', title: note.content.substring(0, 20) + '...', content: note.content })}
                                                     className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-3 ${selectedItems.find(i => i.id === note.id) ? 'bg-accent/10 text-accent font-bold' : 'hover:bg-foreground/5 text-foreground'}`}
                                                 >
@@ -570,6 +620,7 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                                                     <button
                                                         key={todo.id}
                                                         type="button"
+                                                        disabled={isLimitReached}
                                                         onClick={() => toggleItemSelection({ id: todo.id, type: 'todo', title: todo.content.substring(0, 20) + '...', content: todo.content })}
                                                         className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all flex items-center gap-3 ${selectedItems.find(i => i.id === todo.id) ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-foreground/5 text-foreground'}`}
                                                     >
@@ -587,8 +638,8 @@ export default function ProjectChat({ project, aiTokensUsed = 0, aiTokenLimit = 
                     <input
                         value={input}
                         onChange={handleInputChange}
-                        disabled={isLoading || aiTokensUsed >= aiTokenLimit}
-                        placeholder={aiTokensUsed >= aiTokenLimit ? "Limit." : (chatMode === 'conversation' ? "Frag mich..." : "Planen?")}
+                        disabled={isLoading || isLimitReached}
+                        placeholder={isLimitReached ? "Token-Limit erreicht." : (chatMode === 'conversation' ? "Frag mich..." : "Planen?")}
                         className="flex-1 bg-card border border-border rounded-xl px-4 lg:px-6 py-2.5 lg:py-4 text-sm lg:text-lg text-foreground outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/30 shadow-inner disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <button

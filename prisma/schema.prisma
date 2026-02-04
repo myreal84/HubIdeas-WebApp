@@ -18,6 +18,7 @@ model Project {
   todos          Todo[]
   notes          Note[]
   chatMessages   ChatMessage[]
+  files          ProjectFile[]
   owner          User?    @relation("ProjectOwner", fields: [ownerId], references: [id])
   ownerId        String?
   sharedWith     User[]   @relation("ProjectCollaborators")
@@ -40,10 +41,30 @@ model User {
   sharedProjects Project[] @relation("ProjectCollaborators")
   createdTodos   Todo[]    @relation("TodoCreator")
   createdNotes   Note[]    @relation("NoteCreator")
-  aiTokenLimit   Int       @default(50000)
-  aiTokensUsed   Int       @default(0)
+  aiTokenLimit   BigInt    @default(50000)
+  aiTokensUsed   BigInt    @default(0)
   lastTokenReset DateTime  @default(now())
+  storageLimit   BigInt    @default(104857600) // 100MB in bytes
+  storageUsed    BigInt    @default(0)
+  files          ProjectFile[]    @relation("FileUploader")
 }
+
+
+model ProjectFile {
+  id        String   @id @default(cuid())
+  name      String
+  type      String
+  size      Int
+  content   Bytes    // Encrypted content
+  iv        String   // Init Vector for encryption
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  uploader  User?    @relation("FileUploader", fields: [uploaderId], references: [id])
+  uploaderId String?
+  createdAt DateTime @default(now())
+}
+
+
 
 model Account {
   id                String  @id @default(cuid())
@@ -84,6 +105,7 @@ model Todo {
   id          String   @id @default(cuid())
   content     String
   isCompleted Boolean  @default(false)
+  order       Float    @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -95,6 +117,7 @@ model Todo {
 model Note {
   id          String   @id @default(cuid())
   content     String
+  order       Float    @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)

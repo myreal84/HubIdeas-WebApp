@@ -41,11 +41,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 }
             },
             todos: {
-                orderBy: { createdAt: "desc" },
+                orderBy: [
+                    { isCompleted: "asc" },
+                    { order: "asc" },
+                    { createdAt: "desc" }
+                ],
                 include: { creator: { select: { name: true } } }
             },
             notes: {
-                orderBy: { createdAt: "desc" },
+                orderBy: { order: "asc" },
                 include: { creator: { select: { name: true } } }
             },
             chatMessages: { orderBy: { createdAt: "asc" } },
@@ -65,8 +69,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             project={project as unknown as Project}
             isAdmin={isAdmin}
             pendingUsersCount={pendingUsersCount}
-            aiTokensUsed={user?.aiTokensUsed || 0}
-            aiTokenLimit={user?.aiTokenLimit || 2000}
+            aiTokensUsed={Number(user?.aiTokensUsed || 0)}
+            aiTokenLimit={Number(user?.aiTokenLimit || 2000)}
         />
     );
 }

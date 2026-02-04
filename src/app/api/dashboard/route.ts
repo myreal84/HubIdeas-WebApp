@@ -13,7 +13,7 @@ export async function GET() {
     const isAdmin = (session.user as any)?.role === "ADMIN";
     const pendingUsersCount = isAdmin ? await getPendingUsersCount() : 0;
 
-    const [activeProjects, archivedProjects] = await Promise.all([
+    const [activeProjects, archivedProjects, userData] = await Promise.all([
         prisma.project.findMany({
             where: {
                 isArchived: false,
@@ -27,7 +27,14 @@ export async function GET() {
                 _count: {
                     select: { todos: { where: { isCompleted: false } } }
                 },
-                sharedWith: true,
+                sharedWith: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        image: true
+                    }
+                },
             }
         }),
         prisma.project.findMany({
@@ -43,8 +50,19 @@ export async function GET() {
                 _count: {
                     select: { todos: { where: { isCompleted: false } } }
                 },
-                sharedWith: true,
+                sharedWith: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        image: true
+                    }
+                },
             }
+        }),
+        prisma.user.findUnique({
+            where: { id: session.user?.id },
+            select: { storageLimit: true, storageUsed: true, aiTokensUsed: true, aiTokenLimit: true }
         })
     ]);
 
@@ -54,6 +72,16 @@ export async function GET() {
         pendingUsersCount,
         activeProjects,
         archivedProjects,
+        storageUsage: {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            limit: (userData as any)?.storageLimit?.toString() || "104857600",
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            used: (userData as any)?.storageUsed?.toString() || "0"
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        aiTokensUsed: Number((userData as any)?.aiTokensUsed || 0),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        aiTokenLimit: Number((userData as any)?.aiTokenLimit || 0),
         vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""
     });
 }

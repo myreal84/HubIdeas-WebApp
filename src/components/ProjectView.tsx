@@ -15,11 +15,30 @@ import {
     Sparkles,
     X,
     Pencil,
-    Users
+    Users,
+    GripVertical
 } from "lucide-react";
 import Link from "next/link";
 import { Project, Todo, Note } from "@/lib/types";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { reorderTodo, reorderNote } from "@/lib/actions";
 import ProjectChat from "./ProjectChat";
 import ProjectMenu from "./ProjectMenu";
 import ShareDialog from "./ShareDialog";
@@ -35,6 +54,8 @@ import {
     updateProjectName
 } from "@/lib/actions";
 
+import FilesDialog from "./FilesDialog";
+
 type ProjectViewProps = {
     project: Project;
     isAdmin?: boolean;
@@ -42,6 +63,35 @@ type ProjectViewProps = {
     aiTokensUsed?: number;
     aiTokenLimit?: number;
 };
+
+function SortableItem({ id, children, disabled }: { id: string, children: React.ReactNode, disabled?: boolean }) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id, disabled });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 10 : 1,
+        position: 'relative' as const,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className={isDragging ? 'opacity-50' : ''}>
+            <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/20 hover:text-muted-foreground/60 transition-colors touch-none" {...attributes} {...listeners}>
+                <GripVertical size={16} />
+            </div>
+            <div className="pl-6">
+                {children}
+            </div>
+        </div>
+    );
+}
 
 export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTokensUsed, aiTokenLimit }: ProjectViewProps) {
     const [activeTab, setActiveTab] = useState<"todos" | "notes" | "chat">("todos");
@@ -56,18 +106,113 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [editContent, setEditContent] = useState("");
 
+
+
     // Project Name Edit State
     const [isEditingName, setIsEditingName] = useState(false);
     const [nameInputValue, setNameInputValue] = useState(project.name);
+    const [isFilesDialogOpen, setIsFilesDialogOpen] = useState(false);
 
-    // Sync local name state just in case props change (e.g. real-time)
+    // Optimistic State for Dnd
+    const [optimisticTodos, setOptimisticTodos] = useState(project.todos);
+    const [optimisticNotes, setOptimisticNotes] = useState(project.notes);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
     useEffect(() => {
-        setNameInputValue(project.name);
-    }, [project.name]);
+        // When server data updates, sync ONLY if not currently dragging (to avoid jumps)
+        // For simplicity, we sync always, but ideally we'd check dragging state.
+        // Actually, preventing re-sync during drag is hard without tracking explicit 'isDragging' state here.
+        // Let's rely on fast re-renders.
+        setOptimisticTodos(project.todos);
+    }, [project.todos]);
+
+    useEffect(() => {
+        setOptimisticNotes(project.notes);
+    }, [project.notes]);
 
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    const handleDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const activeId = active.id as string;
+        const overId = over.id as string;
+
+        // Check if Todo
+        const isTodo = optimisticTodos.some(t => t.id === activeId);
+        if (isTodo) {
+            setOptimisticTodos((items) => {
+                const oldIndex = items.findIndex(t => t.id === activeId);
+                const newIndex = items.findIndex(t => t.id === overId);
+                const newItems = arrayMove(items, oldIndex, newIndex);
+
+                // Calculate Rank
+                const prevOrder = newItems[newIndex - 1]?.order;
+                const nextOrder = newItems[newIndex + 1]?.order;
+
+                let newOrder = 0;
+                if (prevOrder !== undefined && nextOrder !== undefined) {
+                    newOrder = (prevOrder + nextOrder) / 2;
+                } else if (prevOrder !== undefined) {
+                    newOrder = prevOrder + 1;
+                } else if (nextOrder !== undefined) {
+                    newOrder = nextOrder - 1;
+                }
+
+                // Call server action without awaiting to keep UI responsive
+                reorderTodo(activeId, newOrder).catch(err => {
+                    console.error("Failed to reorder todo:", err);
+                    // Revert? Would require more complex state management.
+                });
+
+                // Optimistically update the moved item's order so subsequent moves work correctly locally
+                newItems[newIndex] = { ...newItems[newIndex], order: newOrder };
+
+                return newItems;
+            });
+            return;
+        }
+
+        // Check if Note
+        const isNote = optimisticNotes.some(n => n.id === activeId);
+        if (isNote) {
+            setOptimisticNotes((items) => {
+                const oldIndex = items.findIndex(n => n.id === activeId);
+                const newIndex = items.findIndex(n => n.id === overId);
+                const newItems = arrayMove(items, oldIndex, newIndex);
+
+                const prevOrder = newItems[newIndex - 1]?.order;
+                const nextOrder = newItems[newIndex + 1]?.order;
+
+                let newOrder = 0;
+                if (prevOrder !== undefined && nextOrder !== undefined) {
+                    newOrder = (prevOrder + nextOrder) / 2;
+                } else if (prevOrder !== undefined) {
+                    newOrder = prevOrder + 1;
+                } else if (nextOrder !== undefined) {
+                    newOrder = nextOrder - 1;
+                }
+
+                reorderNote(activeId, newOrder).catch(err => console.error("Failed to reorder note", err));
+                newItems[newIndex] = { ...newItems[newIndex], order: newOrder };
+
+                return newItems;
+            });
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -118,432 +263,508 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
         setIsEditingName(false);
     };
 
-    // Sort todos: active first, then completed (both by creation date)
-    const sortedTodos = [...project.todos].sort((a, b) => {
-        if (a.isCompleted === b.isCompleted) {
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        }
-        return a.isCompleted ? 1 : -1;
-    });
+
 
     return (
-        <div className="main-container animate-fade-in pb-16">
-            <header className="mb-6 lg:mb-16">
-                <div className="flex items-center gap-4 lg:gap-6">
-                    <Link href="/" className="group p-3 lg:p-4 bg-foreground/5 hover:bg-primary/20 rounded-2xl transition-all border border-border backdrop-blur-md shadow-xl">
-                        <ArrowLeft size={16} className="lg:w-6 lg:h-6 group-hover:-translate-x-1 transition-transform text-muted-foreground group-hover:text-primary" />
-                    </Link>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 group">
-                            {isEditingName ? (
-                                <input
-                                    type="text"
-                                    autoFocus
-                                    value={nameInputValue}
-                                    onChange={(e) => setNameInputValue(e.target.value)}
-                                    onBlur={handleSaveName}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSaveName();
-                                        if (e.key === 'Escape') {
-                                            setNameInputValue(project.name);
-                                            setIsEditingName(false);
-                                        }
-                                    }}
-                                    className="text-xl md:text-5xl lg:text-3xl font-black title-font tracking-tight leading-tight bg-transparent border-b-2 border-primary outline-none min-w-[200px]"
-                                />
-                            ) : (
-                                <h1
-                                    className={`text-xl md:text-5xl lg:text-3xl font-black title-font tracking-tight leading-tight line-clamp-2 ${project.isArchived ? 'opacity-30 line-through' : 'text-foreground'}`}
-                                >
-                                    {project.name}
-                                </h1>
-                            )}
-
-                            {!isEditingName && !project.isArchived && (
-                                <button
-                                    onClick={() => setIsEditingName(true)}
-                                    className="p-1.5 rounded-full text-muted-foreground/30 hover:bg-foreground/5 hover:text-primary transition-all opacity-0 group-hover:opacity-100"
-                                    title="Titel bearbeiten"
-                                >
-                                    <Pencil size={18} />
-                                </button>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 lg:mt-3">
-                            {project.isArchived ? (
-                                <span className="flex items-center gap-2 text-slate-400 font-bold text-[9px] lg:text-xs uppercase tracking-widest bg-slate-400/10 px-2 lg:px-3 py-1 lg:py-1.5 rounded-full border border-slate-400/20">
-                                    <Archive className="w-[10px] h-[10px] lg:w-3 lg:h-3" /> Archiviert
-                                </span>
-                            ) : (
-                                <span className="flex items-center gap-2 text-primary font-bold text-[9px] lg:text-xs uppercase tracking-widest bg-primary/10 px-2 lg:px-3 py-1 lg:py-1.5 rounded-full border border-primary/20">
-                                    <div className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-primary animate-pulse" /> Aktiv
-                                </span>
-                            )}
-
-                            {/* Collaborators Stack */}
-                            {project.sharedWith.length > 0 && (
-                                <div className="flex -space-x-2 ml-2">
-                                    {project.sharedWith.map((user) => (
-                                        <div key={user.id} className="w-6 h-6 rounded-full border-2 border-background overflow-hidden" title={user.name || ""}>
-                                            <UserAvatar src={user.image} name={user.name} size="sm" />
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Share Button (Owner only) */}
-                            {isAdmin && !project.isArchived && (
-                                <button
-                                    onClick={() => setIsShareDialogOpen(true)}
-                                    className="p-1.5 bg-foreground/5 hover:bg-primary/20 rounded-lg transition-all border border-border text-muted-foreground hover:text-primary ml-1"
-                                    title="Projekt teilen"
-                                >
-                                    <Users size={14} />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            {/* Mobile Tabs & Sticky Input Header */}
-            <div className="lg:hidden sticky top-2 z-40 mb-6">
-                <div className="grid grid-cols-2 p-1 bg-background/80 backdrop-blur-2xl rounded-t-2xl border border-border shadow-2xl">
-                    <button
-                        onClick={() => setActiveTab("todos")}
-                        className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl font-bold uppercase tracking-widest text-[8px] transition-all ${activeTab === "todos"
-                            ? 'bg-gradient-to-br from-primary to-accent text-white shadow-lg'
-                            : 'text-slate-500'
-                            }`}
-                    >
-                        <CheckSquare size={14} />
-                        <span>Aufgaben</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab("notes")}
-                        className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl font-bold uppercase tracking-widest text-[8px] transition-all ${activeTab === "notes"
-                            ? 'bg-gradient-to-br from-primary to-accent text-white shadow-lg'
-                            : 'text-slate-500'
-                            }`}
-                    >
-                        <StickyNote size={14} />
-                        <span>Gedanken</span>
-                    </button>
-                </div>
-
-                {/* Slim Inline Input for Mobile - Integrated with Tabs */}
-                {!project.isArchived && mounted && (
-                    <motion.form
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        onSubmit={handleSubmit}
-                        className="flex gap-2 p-1 bg-background/60 rounded-b-2xl border-x border-b border-border backdrop-blur-xl shadow-xl border-t-0"
-                    >
-                        <input
-                            type="text"
-                            value={activeTab === "todos" ? todoInputValue : noteInputValue}
-                            onChange={(e) => activeTab === "todos" ? setTodoInputValue(e.target.value) : setNoteInputValue(e.target.value)}
-                            placeholder={activeTab === "todos" ? "Aufgabe hinzufügen..." : "Gedanke festhalten..."}
-                            className="flex-1 bg-transparent border-none outline-none px-3 py-1.5 text-xs font-bold placeholder:text-muted-foreground/30 text-foreground"
-                        />
-                        <button
-                            type="submit"
-                            disabled={loading || !(activeTab === "todos" ? todoInputValue : noteInputValue).trim()}
-                            className="w-10 h-8 rounded-lg bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center transition-all active:scale-95 disabled:opacity-30 flex-shrink-0"
-                        >
-                            {loading ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={16} strokeWidth={3} />}
-                        </button>
-                    </motion.form>
-                )}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-                {/* To-Dos Section */}
-                <div className={`${activeTab !== "todos" ? "hidden lg:block" : "block"} space-y-4 lg:space-y-8`}>
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-4 bg-foreground/5 py-3 px-6 rounded-2xl border border-border">
-                            <h2 className="text-lg lg:text-2xl font-black text-foreground/90 uppercase tracking-widest leading-none">Aufgaben</h2>
-                            <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-1 rounded-md border border-primary/20 uppercase tracking-tighter">
-                                {project.todos.filter((t: Todo) => !t.isCompleted).length} Offen
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Desktop Inline Task Input */}
-                    <motion.form
-                        layout
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            if (todoInputValue.trim()) {
-                                addTodo(project.id, todoInputValue);
-                                setTodoInputValue("");
-                            }
-                        }}
-                        className="hidden lg:flex gap-4 p-2 bg-background/60 rounded-3xl border border-border overflow-hidden focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10 transition-all mb-8 shadow-2xl"
-                    >
-                        <input
-                            type="text"
-                            value={todoInputValue}
-                            onChange={(e) => setTodoInputValue(e.target.value)}
-                            placeholder="Neue Aufgabe..."
-                            className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-foreground text-lg font-bold placeholder:text-muted-foreground/30"
-                        />
-                        <button type="submit" className="bg-primary hover:brightness-110 text-white p-4 rounded-2xl transition-all shadow-lg">
-                            <Plus size={24} strokeWidth={3} />
-                        </button>
-                    </motion.form>
-
-                    <motion.div className="space-y-2 lg:space-y-4" layout>
-                        <AnimatePresence mode="popLayout">
-                            {project.todos.length === 0 && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="text-center py-16 lg:py-24 bg-foreground/5 rounded-[2rem] border-2 border-dashed border-border group"
-                                >
-                                    <CheckSquare className="w-10 h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground/20 mb-4 group-hover:text-muted-foreground/30 transition-colors" />
-                                    <p className="text-muted-foreground font-bold text-sm lg:text-lg tracking-tight">Alles erledigt.</p>
-                                </motion.div>
-                            )}
-                            {sortedTodos.map((todo: Todo) => (
-                                <motion.div
-                                    key={todo.id}
-                                    layout
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: 20 }}
-                                    className={`group flex items-center gap-4 p-4 lg:p-6 bg-card border border-border rounded-2xl lg:rounded-3xl transition-all hover:bg-card/80 hover:border-primary/30 relative min-h-[64px] lg:min-h-[80px] shadow-sm hover:shadow-xl ${todo.isCompleted ? 'opacity-40 grayscale-[0.5]' : ''}`}
-                                >
-                                    <button
-                                        onClick={async () => {
-                                            try {
-                                                await toggleTodo(todo.id, !todo.isCompleted);
-                                            } catch (error) {
-                                                console.error("Toggle failed:", error);
+        <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+        >
+            <div className="main-container animate-fade-in pb-16">
+                <header className="mb-6 lg:mb-16">
+                    <div className="flex items-center gap-4 lg:gap-6">
+                        <Link href="/" className="group p-3 lg:p-4 bg-foreground/5 hover:bg-primary/20 rounded-2xl transition-all border border-border backdrop-blur-md shadow-xl">
+                            <ArrowLeft size={16} className="lg:w-6 lg:h-6 group-hover:-translate-x-1 transition-transform text-muted-foreground group-hover:text-primary" />
+                        </Link>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 group">
+                                {isEditingName ? (
+                                    <input
+                                        type="text"
+                                        autoFocus
+                                        value={nameInputValue}
+                                        onChange={(e) => setNameInputValue(e.target.value)}
+                                        onBlur={handleSaveName}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleSaveName();
+                                            if (e.key === 'Escape') {
+                                                setNameInputValue(project.name);
+                                                setIsEditingName(false);
                                             }
                                         }}
-                                        className={`relative z-10 transition-all hover:scale-110 active:scale-95 ${todo.isCompleted ? 'text-green-500' : 'text-slate-400 hover:text-primary'}`}
+                                        className="text-xl md:text-5xl lg:text-3xl font-black title-font tracking-tight leading-tight bg-transparent border-b-2 border-primary outline-none min-w-[200px]"
+                                    />
+                                ) : (
+                                    <h1
+                                        className={`text-xl md:text-5xl lg:text-3xl font-black title-font tracking-tight leading-tight line-clamp-2 ${project.isArchived ? 'opacity-30 line-through' : 'text-foreground'}`}
                                     >
-                                        {todo.isCompleted ? <CheckCircle2 className="w-6 h-6 lg:w-8 lg:h-8" strokeWidth={2.5} /> : <Circle className="w-6 h-6 lg:w-8 lg:h-8" strokeWidth={2.5} />}
+                                        {project.name}
+                                    </h1>
+                                )}
+
+                                {!isEditingName && !project.isArchived && (
+                                    <button
+                                        onClick={() => setIsEditingName(true)}
+                                        className="p-1.5 rounded-full text-muted-foreground/30 hover:bg-foreground/5 hover:text-primary transition-all opacity-0 group-hover:opacity-100"
+                                        title="Titel bearbeiten"
+                                    >
+                                        <Pencil size={18} />
                                     </button>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 lg:mt-3">
+                                {project.isArchived ? (
+                                    <span className="flex items-center gap-2 text-slate-400 font-bold text-[9px] lg:text-xs uppercase tracking-widest bg-slate-400/10 px-2 lg:px-3 py-1 lg:py-1.5 rounded-full border border-slate-400/20">
+                                        <Archive className="w-[10px] h-[10px] lg:w-3 lg:h-3" /> Archiviert
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-2 text-primary font-bold text-[9px] lg:text-xs uppercase tracking-widest bg-primary/10 px-2 lg:px-3 py-1 lg:py-1.5 rounded-full border border-primary/20">
+                                        <div className="w-1 h-1 lg:w-1.5 lg:h-1.5 rounded-full bg-primary animate-pulse" /> Aktiv
+                                    </span>
+                                )}
 
-                                    {editingTodoId === todo.id ? (
-                                        <div className="flex-1 flex flex-col gap-3">
-                                            <textarea
-                                                autoFocus
-                                                value={editContent}
-                                                onChange={(e) => setEditContent(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Escape') setEditingTodoId(null);
-                                                }}
-                                                className="w-full bg-foreground/5 border border-border rounded-xl p-4 text-foreground font-bold outline-none focus:border-primary min-h-[80px] resize-none"
-                                            />
-                                            <div className="flex justify-end gap-2">
-                                                <button onClick={() => setEditingTodoId(null)} className="px-4 py-2 rounded-xl text-muted-foreground hover:text-foreground transition-colors font-bold uppercase text-[10px] tracking-widest">
-                                                    Abbrechen
-                                                </button>
-                                                <button onClick={() => handleSaveTodo(todo.id)} className="px-4 py-2 bg-primary rounded-xl text-white hover:brightness-110 transition-all font-bold uppercase text-[10px] tracking-widest">
-                                                    Speichern
-                                                </button>
+                                {/* Collaborators Stack */}
+                                {project.sharedWith.length > 0 && (
+                                    <div className="flex -space-x-2 ml-2">
+                                        {project.sharedWith.map((user) => (
+                                            <div key={user.id} className="w-6 h-6 rounded-full border-2 border-background overflow-hidden" title={user.name || ""}>
+                                                <UserAvatar src={user.image} name={user.name} size="sm" />
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="flex flex-col flex-1">
-                                                <span className={`relative z-10 font-bold text-base lg:text-2xl transition-all ${todo.isCompleted ? 'line-through opacity-50 italic' : 'text-foreground'}`}>
-                                                    {todo.content}
-                                                </span>
-                                                {todo.creator?.name && (
-                                                    <span className="text-[10px] italic opacity-40 font-medium">von {todo.creator.name}</span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => handleEditTodo(todo)}
-                                                    className="relative z-10 btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-muted-foreground hover:text-primary"
-                                                >
-                                                    <Pencil className="w-4 h-4 lg:w-5 lg:h-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => deleteTodo(todo.id)}
-                                                    className="relative z-10 btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-muted-foreground hover:text-red-400"
-                                                >
-                                                    <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
-                                                </button>
-                                            </div>
-                                        </>
-                                    )}
-                                </motion.div>
-                            ))}
-                        </AnimatePresence>
-                    </motion.div>
-                    {/* Mobile Spacer */}
-                    <div className="lg:hidden h-16" />
-                </div>
+                                        ))}
+                                    </div>
+                                )}
 
-                {/* Notes Section */}
-                <div className={`${activeTab !== "notes" ? "hidden lg:block" : "block"} space-y-4 lg:space-y-8`}>
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-4 bg-foreground/5 py-3 px-6 rounded-2xl border border-border">
-                            <h2 className="text-lg lg:text-2xl font-black text-foreground/90 uppercase tracking-widest leading-none" id="notes-heading">Gedanken</h2>
-                            <span className="text-[10px] font-black text-accent bg-accent/10 px-2 py-1 rounded-md border border-accent/20 uppercase tracking-tighter">
-                                {project.notes.length} Notizen
-                            </span>
+                                {/* Share Button (Owner only) */}
+                                {isAdmin && !project.isArchived && (
+                                    <button
+                                        onClick={() => setIsShareDialogOpen(true)}
+                                        className="p-1.5 bg-foreground/5 hover:bg-primary/20 rounded-lg transition-all border border-border text-muted-foreground hover:text-primary ml-1"
+                                        title="Projekt teilen"
+                                    >
+                                        <Users size={14} />
+                                    </button>
+                                )}
+
+                                {!project.isArchived && (
+                                    <button
+                                        onClick={() => setIsFilesDialogOpen(true)}
+                                        className="p-1.5 bg-foreground/5 hover:bg-accent/20 rounded-lg transition-all border border-border text-muted-foreground hover:text-accent ml-1"
+                                        title="Dateien"
+                                    >
+                                        <StickyNote size={14} className="rotate-12" />
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
+                </header>
 
-                    {/* Desktop Inline Note Input */}
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            if (noteInputValue.trim()) {
-                                addNote(project.id, noteInputValue);
-                                setNoteInputValue("");
-                            }
-                        }}
-                        className="hidden lg:flex gap-4 p-2 bg-background/60 rounded-3xl border border-border overflow-hidden focus-within:border-accent/50 transition-all mb-8"
-                    >
-                        <input
-                            type="text"
-                            value={noteInputValue}
-                            onChange={(e) => setNoteInputValue(e.target.value)}
-                            placeholder="Gedanken festhalten..."
-                            className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-foreground text-lg font-bold placeholder:text-muted-foreground/30"
-                        />
-                        <button type="submit" className="bg-accent hover:brightness-110 text-white p-4 rounded-2xl transition-all shadow-lg">
-                            <Plus size={24} strokeWidth={3} />
+                {/* Mobile Tabs & Sticky Input Header */}
+                <div className="lg:hidden sticky top-2 z-40 mb-6">
+                    <div className="grid grid-cols-2 p-1 bg-background/80 backdrop-blur-2xl rounded-t-2xl border border-border shadow-2xl">
+                        <button
+                            onClick={() => setActiveTab("todos")}
+                            className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl font-bold uppercase tracking-widest text-[8px] transition-all ${activeTab === "todos"
+                                ? 'bg-gradient-to-br from-primary to-accent text-white shadow-lg'
+                                : 'text-slate-500'
+                                }`}
+                        >
+                            <CheckSquare size={14} />
+                            <span>Aufgaben</span>
                         </button>
-                    </form>
+                        <button
+                            onClick={() => setActiveTab("notes")}
+                            className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl font-bold uppercase tracking-widest text-[8px] transition-all ${activeTab === "notes"
+                                ? 'bg-gradient-to-br from-primary to-accent text-white shadow-lg'
+                                : 'text-slate-500'
+                                }`}
+                        >
+                            <StickyNote size={14} />
+                            <span>Gedanken</span>
+                        </button>
+                    </div>
 
-                    <motion.div className="grid grid-cols-1 gap-4" layout>
-                        <AnimatePresence mode="popLayout">
-                            {project.notes.length === 0 && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="text-center py-16 lg:py-24 bg-foreground/5 rounded-[2rem] border-2 border-dashed border-border group"
+                    {/* Slim Inline Input for Mobile - Integrated with Tabs */}
+                    {!project.isArchived && mounted && (
+                        <motion.form
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            onSubmit={handleSubmit}
+                            className="flex gap-2 p-1 bg-background/60 rounded-b-2xl border-x border-b border-border backdrop-blur-xl shadow-xl border-t-0"
+                        >
+                            <input
+                                type="text"
+                                value={activeTab === "todos" ? todoInputValue : noteInputValue}
+                                onChange={(e) => activeTab === "todos" ? setTodoInputValue(e.target.value) : setNoteInputValue(e.target.value)}
+                                placeholder={activeTab === "todos" ? "Aufgabe hinzufügen..." : "Gedanke festhalten..."}
+                                className="flex-1 bg-transparent border-none outline-none px-3 py-1.5 text-xs font-bold placeholder:text-muted-foreground/30 text-foreground"
+                            />
+                            <button
+                                type="submit"
+                                disabled={loading || !(activeTab === "todos" ? todoInputValue : noteInputValue).trim()}
+                                className="w-10 h-8 rounded-lg bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center transition-all active:scale-95 disabled:opacity-30 flex-shrink-0"
+                            >
+                                {loading ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={16} strokeWidth={3} />}
+                            </button>
+                        </motion.form>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+                    {/* To-Dos Section */}
+                    <div className={`${activeTab !== "todos" ? "hidden lg:block" : "block"} space-y-4 lg:space-y-8`}>
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-4 bg-foreground/5 py-3 px-6 rounded-2xl border border-border">
+                                <h2 className="text-lg lg:text-2xl font-black text-foreground/90 uppercase tracking-widest leading-none">Aufgaben</h2>
+                                <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-1 rounded-md border border-primary/20 uppercase tracking-tighter">
+                                    {project.todos.filter((t: Todo) => !t.isCompleted).length} Offen
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Desktop Inline Task Input */}
+                        <motion.form
+                            layout
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                if (todoInputValue.trim()) {
+                                    addTodo(project.id, todoInputValue);
+                                    setTodoInputValue("");
+                                }
+                            }}
+                            className="hidden lg:flex gap-4 p-2 bg-background/60 rounded-3xl border border-border overflow-hidden focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10 transition-all mb-8 shadow-2xl"
+                        >
+                            <input
+                                type="text"
+                                value={todoInputValue}
+                                onChange={(e) => setTodoInputValue(e.target.value)}
+                                placeholder="Neue Aufgabe..."
+                                className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-foreground text-lg font-bold placeholder:text-muted-foreground/30"
+                            />
+                            <button type="submit" className="bg-primary hover:brightness-110 text-white p-4 rounded-2xl transition-all shadow-lg">
+                                <Plus size={24} strokeWidth={3} />
+                            </button>
+                        </motion.form>
+
+                        <motion.div className="space-y-2 lg:space-y-4" layout>
+                            <AnimatePresence mode="popLayout">
+                                {optimisticTodos.length === 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        className="text-center py-16 lg:py-24 bg-foreground/5 rounded-[2rem] border-2 border-dashed border-border group"
+                                    >
+                                        <CheckSquare className="w-10 h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground/20 mb-4 group-hover:text-muted-foreground/30 transition-colors" />
+                                        <p className="text-muted-foreground font-bold text-sm lg:text-lg tracking-tight">Alles erledigt.</p>
+                                    </motion.div>
+                                )}
+
+                                {/* Active Todos - Sortable */}
+                                <SortableContext
+                                    items={optimisticTodos.filter(t => !t.isCompleted).map(t => t.id)}
+                                    strategy={verticalListSortingStrategy}
                                 >
-                                    <StickyNote className="w-10 h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground/20 mb-4 group-hover:text-muted-foreground/30 transition-colors" />
-                                    <p className="text-muted-foreground font-bold text-sm lg:text-lg tracking-tight">Deine Ideen.</p>
-                                </motion.div>
-                            )}
-                            {project.notes.map((note: Note) => (
-                                <motion.div
-                                    key={note.id}
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    className="group relative p-4 lg:p-8 bg-card border border-border rounded-2xl lg:rounded-3xl hover:bg-card/80 transition-all min-h-[80px] lg:min-h-[120px] shadow-sm hover:shadow-xl"
-                                >
-                                    <div className="flex justify-between items-start gap-4 lg:gap-6 mb-4 lg:mb-6">
-                                        {editingNoteId === note.id ? (
-                                            <div className="flex-1 flex flex-col gap-3">
-                                                <textarea
-                                                    autoFocus
-                                                    value={editContent}
-                                                    onChange={(e) => setEditContent(e.target.value)}
-                                                    className="w-full bg-foreground/5 border border-border rounded-xl p-4 text-foreground font-bold outline-none focus:border-accent min-h-[100px] resize-none"
-                                                />
-                                                <div className="flex justify-end gap-2">
-                                                    <button onClick={() => setEditingNoteId(null)} className="px-4 py-2 rounded-xl text-muted-foreground hover:text-foreground transition-colors font-bold uppercase text-[10px] tracking-widest">
-                                                        Abbrechen
-                                                    </button>
-                                                    <button onClick={() => handleSaveNote(note.id)} className="px-4 py-2 bg-accent rounded-xl text-white hover:brightness-110 transition-all font-bold uppercase text-[10px] tracking-widest">
-                                                        Speichern
-                                                    </button>
+                                    {optimisticTodos.filter(t => !t.isCompleted).map((todo: Todo) => (
+                                        <SortableItem key={todo.id} id={todo.id}>
+                                            <motion.div
+                                                layout
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                exit={{ opacity: 0, x: 20 }}
+                                                className="group flex items-center gap-4 p-4 lg:p-6 bg-card border border-border rounded-2xl lg:rounded-3xl transition-all hover:bg-card/80 hover:border-primary/30 relative min-h-[64px] lg:min-h-[80px] shadow-sm hover:shadow-xl"
+                                            >
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            await toggleTodo(todo.id, !todo.isCompleted);
+                                                        } catch (error) {
+                                                            console.error("Toggle failed:", error);
+                                                        }
+                                                    }}
+                                                    className="relative z-10 transition-all hover:scale-110 active:scale-95 text-slate-400 hover:text-primary"
+                                                >
+                                                    <Circle className="w-6 h-6 lg:w-8 lg:h-8" strokeWidth={2.5} />
+                                                </button>
+
+                                                {editingTodoId === todo.id ? (
+                                                    <div className="flex-1 flex flex-col gap-3">
+                                                        <textarea
+                                                            autoFocus
+                                                            value={editContent}
+                                                            onChange={(e) => setEditContent(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Escape') setEditingTodoId(null);
+                                                            }}
+                                                            className="w-full bg-foreground/5 border border-border rounded-xl p-4 text-foreground font-bold outline-none focus:border-primary min-h-[80px] resize-none"
+                                                        />
+                                                        <div className="flex justify-end gap-2">
+                                                            <button onClick={() => setEditingTodoId(null)} className="px-4 py-2 rounded-xl text-muted-foreground hover:text-foreground transition-colors font-bold uppercase text-[10px] tracking-widest">
+                                                                Abbrechen
+                                                            </button>
+                                                            <button onClick={() => handleSaveTodo(todo.id)} className="px-4 py-2 bg-primary rounded-xl text-white hover:brightness-110 transition-all font-bold uppercase text-[10px] tracking-widest">
+                                                                Speichern
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="flex flex-col flex-1">
+                                                            <span className="relative z-10 font-bold text-base lg:text-2xl transition-all text-foreground">
+                                                                {todo.content}
+                                                            </span>
+                                                            {todo.creator?.name && (
+                                                                <span className="text-[10px] italic opacity-40 font-medium">von {todo.creator.name}</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => handleEditTodo(todo)}
+                                                                className="relative z-10 btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-muted-foreground hover:text-primary"
+                                                            >
+                                                                <Pencil className="w-4 h-4 lg:w-5 lg:h-5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => deleteTodo(todo.id)}
+                                                                className="relative z-10 btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-muted-foreground hover:text-red-400"
+                                                            >
+                                                                <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </motion.div>
+                                        </SortableItem>
+                                    ))}
+                                </SortableContext>
+
+                                {/* Completed Todos - Static List */}
+                                {optimisticTodos.filter(t => t.isCompleted).length > 0 && (
+                                    <>
+                                        <div className="my-6 border-t border-border/50" />
+                                        {optimisticTodos.filter(t => t.isCompleted).map((todo: Todo) => (
+                                            <motion.div
+                                                key={todo.id}
+                                                layout
+                                                className="group flex items-center gap-4 p-4 lg:p-6 bg-card/50 border border-border/50 rounded-2xl lg:rounded-3xl relative min-h-[64px] lg:min-h-[80px] opacity-60 grayscale-[0.8]"
+                                            >
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            await toggleTodo(todo.id, !todo.isCompleted);
+                                                        } catch (error) {
+                                                            console.error("Toggle failed:", error);
+                                                        }
+                                                    }}
+                                                    className="relative z-10 transition-all hover:scale-110 active:scale-95 text-emerald-500"
+                                                >
+                                                    <CheckCircle2 className="w-6 h-6 lg:w-8 lg:h-8" strokeWidth={2.5} />
+                                                </button>
+
+                                                <div className="flex flex-col flex-1">
+                                                    <span className="relative z-10 font-bold text-base lg:text-2xl transition-all line-through opacity-50 italic text-foreground">
+                                                        {todo.content}
+                                                    </span>
                                                 </div>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <p className="flex-1 text-foreground text-base lg:text-2xl font-bold leading-snug whitespace-pre-wrap">{note.content}</p>
                                                 <div className="flex items-center gap-2">
                                                     <button
-                                                        onClick={() => handleEditNote(note)}
-                                                        className="btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 text-muted-foreground hover:text-accent transition-all"
-                                                    >
-                                                        <Pencil className="w-4 h-4 lg:w-5 lg:h-5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => deleteNote(note.id)}
-                                                        className="btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all"
+                                                        onClick={() => deleteTodo(todo.id)}
+                                                        className="relative z-10 btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-muted-foreground hover:text-red-400"
                                                     >
                                                         <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
                                                     </button>
                                                 </div>
-                                            </>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-3 lg:gap-4 opacity-30">
-                                        <div className="h-px flex-1 bg-border" />
-                                        <div className="flex flex-col items-end">
-                                            <time className="text-[9px] lg:text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                                                {new Date(note.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
-                                            </time>
-                                            {note.creator?.name && (
-                                                <span className="text-[9px] italic font-medium">von {note.creator.name}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </AnimatePresence>
-                    </motion.div>
-                    {/* Mobile Spacer */}
-                    <div className="lg:hidden h-16" />
+                                            </motion.div>
+                                        ))}
+                                    </>
+                                )}
+                            </AnimatePresence>
+                        </motion.div>
+                        {/* Mobile Spacer */}
+                        <div className="lg:hidden h-16" />
+                    </div>
+
+                    {/* Notes Section */}
+                    <div className={`${activeTab !== "notes" ? "hidden lg:block" : "block"} space-y-4 lg:space-y-8`}>
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-4 bg-foreground/5 py-3 px-6 rounded-2xl border border-border">
+                                <h2 className="text-lg lg:text-2xl font-black text-foreground/90 uppercase tracking-widest leading-none" id="notes-heading">Gedanken</h2>
+                                <span className="text-[10px] font-black text-accent bg-accent/10 px-2 py-1 rounded-md border border-accent/20 uppercase tracking-tighter">
+                                    {project.notes.length} Notizen
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Desktop Inline Note Input */}
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                if (noteInputValue.trim()) {
+                                    addNote(project.id, noteInputValue);
+                                    setNoteInputValue("");
+                                }
+                            }}
+                            className="hidden lg:flex gap-4 p-2 bg-background/60 rounded-3xl border border-border overflow-hidden focus-within:border-accent/50 transition-all mb-8"
+                        >
+                            <input
+                                type="text"
+                                value={noteInputValue}
+                                onChange={(e) => setNoteInputValue(e.target.value)}
+                                placeholder="Gedanken festhalten..."
+                                className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-foreground text-lg font-bold placeholder:text-muted-foreground/30"
+                            />
+                            <button type="submit" className="bg-accent hover:brightness-110 text-white p-4 rounded-2xl transition-all shadow-lg">
+                                <Plus size={24} strokeWidth={3} />
+                            </button>
+                        </form>
+
+                        <motion.div className="grid grid-cols-1 gap-4" layout>
+                            <AnimatePresence mode="popLayout">
+                                {optimisticNotes.length === 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        className="text-center py-16 lg:py-24 bg-foreground/5 rounded-[2rem] border-2 border-dashed border-border group"
+                                    >
+                                        <StickyNote className="w-10 h-10 lg:w-12 lg:h-12 mx-auto text-muted-foreground/20 mb-4 group-hover:text-muted-foreground/30 transition-colors" />
+                                        <p className="text-muted-foreground font-bold text-sm lg:text-lg tracking-tight">Deine Ideen.</p>
+                                    </motion.div>
+                                )}
+                                <SortableContext
+                                    items={optimisticNotes.map(n => n.id)}
+                                    strategy={verticalListSortingStrategy}
+                                >
+                                    {optimisticNotes.map((note: Note) => (
+                                        <SortableItem key={note.id} id={note.id}>
+                                            <motion.div
+                                                layout
+                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.95 }}
+                                                className="group relative p-4 lg:p-8 bg-card border border-border rounded-2xl lg:rounded-3xl hover:bg-card/80 transition-all min-h-[80px] lg:min-h-[120px] shadow-sm hover:shadow-xl"
+                                            >
+                                                <div className="flex justify-between items-start gap-4 lg:gap-6 mb-4 lg:mb-6">
+                                                    {editingNoteId === note.id ? (
+                                                        <div className="flex-1 flex flex-col gap-3">
+                                                            <textarea
+                                                                autoFocus
+                                                                value={editContent}
+                                                                onChange={(e) => setEditContent(e.target.value)}
+                                                                className="w-full bg-foreground/5 border border-border rounded-xl p-4 text-foreground font-bold outline-none focus:border-accent min-h-[100px] resize-none"
+                                                            />
+                                                            <div className="flex justify-end gap-2">
+                                                                <button onClick={() => setEditingNoteId(null)} className="px-4 py-2 rounded-xl text-muted-foreground hover:text-foreground transition-colors font-bold uppercase text-[10px] tracking-widest">
+                                                                    Abbrechen
+                                                                </button>
+                                                                <button onClick={() => handleSaveNote(note.id)} className="px-4 py-2 bg-accent rounded-xl text-white hover:brightness-110 transition-all font-bold uppercase text-[10px] tracking-widest">
+                                                                    Speichern
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <p className="flex-1 text-foreground text-base lg:text-2xl font-bold leading-snug whitespace-pre-wrap">{note.content}</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={() => handleEditNote(note)}
+                                                                    className="btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 text-muted-foreground hover:text-accent transition-all"
+                                                                >
+                                                                    <Pencil className="w-4 h-4 lg:w-5 lg:h-5" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => deleteNote(note.id)}
+                                                                    className="btn-ghost opacity-40 lg:opacity-0 lg:group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3 lg:gap-4 opacity-30">
+                                                    <div className="h-px flex-1 bg-border" />
+                                                    <div className="flex flex-col items-end">
+                                                        <time className="text-[9px] lg:text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                                                            {new Date(note.createdAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
+                                                        </time>
+                                                        {note.creator?.name && (
+                                                            <span className="text-[9px] italic font-medium">von {note.creator.name}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        </SortableItem>
+                                    ))}
+                                </SortableContext>
+                            </AnimatePresence>
+                        </motion.div>
+                        {/* Mobile Spacer */}
+                        <div className="lg:hidden h-16" />
+                    </div>
+
+
                 </div>
 
-
-            </div>
-
-            {/* AI Chat Overlay for Desktop */}
-            {mounted && createPortal(
-                <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 lg:p-8 bg-background/90 backdrop-blur-2xl transition-all duration-300 ${isChatOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                    <div className={`relative w-full max-w-4xl h-[85vh] bg-card border border-border rounded-[2.5rem] shadow-[0_0_150px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col transition-all duration-300 ${isChatOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}>
-                        {/* Header */}
-                        <div className="p-6 lg:px-10 lg:py-8 border-b border-border flex items-center justify-between bg-gradient-to-r from-primary/10 to-transparent">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-primary/20 rounded-2xl">
-                                    <Sparkles className="text-primary" size={24} />
+                {/* AI Chat Overlay for Desktop */}
+                {mounted && createPortal(
+                    <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 lg:p-8 bg-background/90 backdrop-blur-2xl transition-all duration-300 ${isChatOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                        <div className={`relative w-full max-w-4xl h-[85vh] bg-card border border-border rounded-[2.5rem] shadow-[0_0_150px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col transition-all duration-300 ${isChatOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}>
+                            {/* Header */}
+                            <div className="p-6 lg:px-10 lg:py-8 border-b border-border flex items-center justify-between bg-gradient-to-r from-primary/10 to-transparent">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-primary/20 rounded-2xl">
+                                        <Sparkles className="text-primary" size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black text-xl lg:text-3xl text-foreground tracking-tight">Projekt Assistent</h3>
+                                        <p className="text-xs lg:text-sm text-muted-foreground font-medium">Dein intelligenter Partner für {project.name}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-black text-xl lg:text-3xl text-foreground tracking-tight">Projekt Assistent</h3>
-                                    <p className="text-xs lg:text-sm text-muted-foreground font-medium">Dein intelligenter Partner für {project.name}</p>
-                                </div>
+                                <button
+                                    onClick={() => setIsChatOpen(false)}
+                                    className="p-3 hover:bg-foreground/5 rounded-2xl text-muted-foreground hover:text-foreground transition-all hover:rotate-90"
+                                >
+                                    <X size={24} />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setIsChatOpen(false)}
-                                className="p-3 hover:bg-foreground/5 rounded-2xl text-muted-foreground hover:text-foreground transition-all hover:rotate-90"
-                            >
-                                <X size={24} />
-                            </button>
+
+                            {/* Chat Window */}
+                            <div className="flex-1 overflow-hidden">
+                                <ProjectChat project={project} aiTokensUsed={aiTokensUsed} aiTokenLimit={aiTokenLimit} />
+                            </div>
                         </div>
+                    </div>,
+                    document.body
+                )}
 
-                        {/* Chat Window */}
-                        <div className="flex-1 overflow-hidden">
-                            <ProjectChat project={project} aiTokensUsed={aiTokensUsed} aiTokenLimit={aiTokenLimit} />
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
+                <ShareDialog
+                    projectId={project.id}
+                    ownerId={project.ownerId}
+                    currentCollaborators={project.sharedWith}
+                    isOpen={isShareDialogOpen}
+                    onClose={() => setIsShareDialogOpen(false)}
+                />
 
-            <ShareDialog
-                projectId={project.id}
-                ownerId={project.ownerId}
-                currentCollaborators={project.sharedWith}
-                isOpen={isShareDialogOpen}
-                onClose={() => setIsShareDialogOpen(false)}
-            />
+                <ProjectMenu
+                    projectId={project.id}
+                    projectName={project.name}
+                    isArchived={project.isArchived}
+                    onOpenChat={() => {
+                        if ((aiTokensUsed ?? 0) < (aiTokenLimit ?? 0)) {
+                            setIsChatOpen(true)
+                        }
+                    }}
+                    isAdmin={isAdmin}
+                    pendingUsersCount={pendingUsersCount}
+                    disableChat={(aiTokensUsed ?? 0) >= (aiTokenLimit ?? 0)}
+                />
 
-            <ProjectMenu
-                projectId={project.id}
-                projectName={project.name}
-                isArchived={project.isArchived}
-                onOpenChat={() => setIsChatOpen(true)}
-                isAdmin={isAdmin}
-                pendingUsersCount={pendingUsersCount}
-            />
-        </div>
+                <FilesDialog
+                    projectId={project.id}
+                    isOpen={isFilesDialogOpen}
+                    onClose={() => setIsFilesDialogOpen(false)}
+                />
+            </div>
+        </DndContext>
     );
 }
