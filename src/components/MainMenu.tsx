@@ -24,6 +24,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { signOut } from 'next-auth/react';
 
 import PushManager from './PushManager';
+import InstallPWA from './InstallPWA';
 
 interface MainMenuProps {
     searchQuery: string;
@@ -37,6 +38,7 @@ interface MainMenuProps {
     isAdmin?: boolean;
     pendingUsersCount?: number;
     storageUsage?: { limit: string, used: string };
+    onBrainstormClick?: () => void;
 }
 
 export default function MainMenu({
@@ -50,7 +52,8 @@ export default function MainMenu({
     activeCount,
     isAdmin,
     pendingUsersCount = 0,
-    storageUsage
+    storageUsage,
+    onBrainstormClick
 }: MainMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -139,6 +142,34 @@ export default function MainMenu({
                                 className="w-12 h-12 rounded-2xl bg-foreground/5 flex items-center justify-center hover:bg-foreground/10 transition-colors"
                             >
                                 <X size={24} />
+                            </button>
+                        </div>
+
+                        {/* Brainstorming Feature */}
+                        <div className="mb-12">
+                            <button
+                                onClick={() => {
+                                    setIsOpen(false);
+                                    if (onBrainstormClick) onBrainstormClick();
+                                }}
+                                className="w-full relative overflow-hidden group p-6 rounded-[2rem] bg-gradient-to-br from-[#1C1F2E] to-[#0F1117] border border-white/10 hover:border-fuchsia-500/50 transition-all shadow-2xl hover:shadow-fuchsia-500/20 text-left"
+                            >
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-600/20 blur-[60px] rounded-full translate-x-10 -translate-y-10 group-hover:bg-fuchsia-600/30 transition-all duration-700" />
+                                <div className="relative z-10">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2.5 bg-fuchsia-500/20 rounded-xl text-fuchsia-400 group-hover:scale-110 transition-transform">
+                                            <Sparkles size={20} />
+                                        </div>
+                                        <span className="text-xs font-black uppercase tracking-widest text-fuchsia-400">Neu</span>
+                                    </div>
+                                    <h3 className="text-2xl font-black text-white mb-2 leading-none">Idee entwickeln</h3>
+                                    <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-[80%]">
+                                        Lass dich von der KI beim Brainstorming unterstützen und erstelle daraus direkt ein Projekt.
+                                    </p>
+                                </div>
+                                <div className="absolute bottom-6 right-6 p-2 bg-white/5 rounded-full text-slate-400 group-hover:text-white group-hover:bg-fuchsia-500 transition-all">
+                                    <ArrowRight size={20} className="-rotate-45 group-hover:rotate-0 transition-transform duration-500" />
+                                </div>
                             </button>
                         </div>
 
@@ -271,10 +302,13 @@ export default function MainMenu({
                             </div>
                         )}
 
-                        {/* Notifications Section */}
+                        {/* Notifications & Install Section */}
                         <div className="mb-12">
-                            <label className="block text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">Erinnerungen</label>
-                            <PushManager vapidPublicKey={vapidPublicKey} />
+                            <label className="block text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mb-4">App & Erinnerungen</label>
+                            <div className="flex flex-wrap gap-3">
+                                <InstallPWA />
+                                <PushManager vapidPublicKey={vapidPublicKey} />
+                            </div>
                         </div>
 
                         {/* Storage Section */}

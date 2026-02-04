@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json();
-        const { projectContext, mode, referencedContext, includeCompleted } = body;
+        const { projectContext, mode, referencedContext, includeCompleted, selectedFileIds } = body;
         let { messages } = body;
 
         // Sanitize messages: Remove empty messages to prevent API errors (e.g. from previous failed turns)
@@ -40,11 +40,16 @@ export async function POST(req: Request) {
             });
         }
 
-        if (!projectContext) {
+        // projectContext is required except for brainstorm mode
+        if (!projectContext && mode !== 'brainstorm') {
             return NextResponse.json({ error: 'projectContext is required' }, { status: 400 });
         }
 
-        const { id: projectId, title, notes, todos } = projectContext;
+        // For brainstorm mode, use defaults since no project exists yet
+        const projectId = projectContext?.id;
+        const title = projectContext?.title || 'Neue Idee';
+        const notes = projectContext?.notes || [];
+        const todos = projectContext?.todos || [];
 
         // Check AI Limit
         const { canUse } = await checkAndResetAiLimit(session.user.id);
@@ -54,14 +59,15 @@ export async function POST(req: Request) {
                 message: 'Du hast dein monatliches Token-Limit erreicht. Bitte kontaktiere einen Admin.'
             }, { status: 429 });
         }
-
-        // Fetch and process files if projectId exists
         let contextParts: any[] = []; // Using any[] to allow flexible CoreMessage parts
 
-        if (projectId) {
+        if (projectId && selectedFileIds && Array.isArray(selectedFileIds) && selectedFileIds.length > 0) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const files = await (prisma as any).projectFile.findMany({
-                where: { projectId },
+                where: {
+                    projectId,
+                    id: { in: selectedFileIds }
+                },
                 orderBy: { createdAt: 'desc' }
             });
 
@@ -168,6 +174,15 @@ REGELN FÜR TO-DO GENERATION:
 4. Beispiel für das JSON-Array: ["Aufgabe 1", "Aufgabe 2"]
 5. Formuliere die Aufgaben kurz, präzise und aktionsorientiert.
 6. Antworte am Ende NUR noch mit dem JSON-Array, kein Text danach.`;
+        } else if (mode === 'brainstorm') {
+            systemPrompt = `Du bist ein kreativer Brainstorming-Partner. Dein Ziel ist es, gemeinsam mit dem Nutzer eine vage Idee in ein konkretes Projektkonzept zu verwandeln.
+
+REGELN:
+1. Stelle gezielte Fragen, um die Idee zu schärfen (Zielgruppe, Umfang, Features, Materialien).
+2. Sei kreativ und mache eigene Vorschläge.
+3. Fasse dich kurz – keine langen Monologe.
+4. Hilf dem Nutzer, Struktur in seine Gedanken zu bringen.
+5. Das Ziel ist es, am Ende genug Infos zu haben, um einen Projekttitel, eine Beschreibung und erste Aufgaben abzuleiten.`;
         } else {
             systemPrompt = `Du bist ein erfahrener Sparringspartner und Kollege für das Projekt "${title}".
 Deine Rolle ist es, Ideen zu reflektieren, Impulse zu geben und dem Nutzer zu helfen, sein Projekt voranzubringen.

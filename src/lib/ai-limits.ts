@@ -28,13 +28,13 @@ export async function checkAndResetAiLimit(userId: string) {
                 lastTokenReset: now
             }
         });
-        return { canUse: true, remaining: user.aiTokenLimit };
+        return { canUse: true, remaining: Number(user.aiTokenLimit) };
     }
 
     const remaining = user.aiTokenLimit - user.aiTokensUsed;
     return {
-        canUse: remaining > 0,
-        remaining: Math.max(0, remaining)
+        canUse: remaining > BigInt(0),
+        remaining: Number(remaining > BigInt(0) ? remaining : BigInt(0))
     };
 }
 

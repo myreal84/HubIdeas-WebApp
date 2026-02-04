@@ -62,7 +62,7 @@ export async function GET() {
         }),
         prisma.user.findUnique({
             where: { id: session.user?.id },
-            select: { storageLimit: true, storageUsed: true }
+            select: { storageLimit: true, storageUsed: true, aiTokensUsed: true, aiTokenLimit: true }
         })
     ]);
 
@@ -78,6 +78,10 @@ export async function GET() {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             used: (userData as any)?.storageUsed?.toString() || "0"
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        aiTokensUsed: Number((userData as any)?.aiTokensUsed || 0),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        aiTokenLimit: Number((userData as any)?.aiTokenLimit || 0),
         vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""
     });
 }

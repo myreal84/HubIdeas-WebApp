@@ -26,7 +26,7 @@ export default function DashboardPage() {
   if (loading) return null;
   if (!data.session) redirect("/login");
 
-  const { isAdmin, pendingUsersCount, activeProjects, archivedProjects } = data;
+  const { isAdmin, pendingUsersCount, activeProjects, archivedProjects, aiTokensUsed, aiTokenLimit } = data;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -72,7 +72,11 @@ export default function DashboardPage() {
 
       <motion.section className="mb-24 flex justify-center" variants={itemVariants}>
         <div className="w-full max-w-2xl bg-foreground/5 backdrop-blur-xl rounded-[3rem] p-2 border border-border shadow-inner shadow-primary/10">
-          <ProjectForm onProjectCreated={fetchData} />
+          <ProjectForm
+            onProjectCreated={fetchData}
+            aiTokensUsed={aiTokensUsed}
+            aiTokenLimit={aiTokenLimit}
+          />
         </div>
       </motion.section>
 
@@ -85,6 +89,8 @@ export default function DashboardPage() {
           pendingUsersCount={pendingUsersCount}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           storageUsage={(data as any).storageUsage}
+          aiTokensUsed={aiTokensUsed}
+          aiTokenLimit={aiTokenLimit}
         />
       </motion.div>
     </motion.div>

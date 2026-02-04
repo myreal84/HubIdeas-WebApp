@@ -69,8 +69,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             project={project as unknown as Project}
             isAdmin={isAdmin}
             pendingUsersCount={pendingUsersCount}
-            aiTokensUsed={user?.aiTokensUsed || 0}
-            aiTokenLimit={user?.aiTokenLimit || 2000}
+            aiTokensUsed={Number(user?.aiTokensUsed || 0)}
+            aiTokenLimit={Number(user?.aiTokenLimit || 2000)}
         />
     );
 }

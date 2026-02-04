@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { createProject, addTodo } from "@/lib/actions";
 import { Plus, Sparkles, X, Check, Loader2 } from "lucide-react";
 
-export default function ProjectForm({ onProjectCreated }: { onProjectCreated?: () => void }) {
+export default function ProjectForm({ onProjectCreated, aiTokensUsed = 0, aiTokenLimit = 2000 }: { onProjectCreated?: () => void, aiTokensUsed?: number, aiTokenLimit?: number }) {
     const [name, setName] = useState("");
     const [note, setNote] = useState("");
     const [loading, setLoading] = useState(false);
@@ -17,9 +17,14 @@ export default function ProjectForm({ onProjectCreated }: { onProjectCreated?: (
     const [addedIndices, setAddedIndices] = useState<Set<number>>(new Set());
     const [mounted, setMounted] = useState(false);
 
+    const isLimitReached = aiTokensUsed >= aiTokenLimit;
+
     useEffect(() => {
         setMounted(true);
-    }, []);
+        if (isLimitReached) {
+            setUseAI(false);
+        }
+    }, [isLimitReached]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -35,7 +40,7 @@ export default function ProjectForm({ onProjectCreated }: { onProjectCreated?: (
             if (onProjectCreated) onProjectCreated();
             setLoading(false);
 
-            if (useAI) {
+            if (useAI && !isLimitReached) {
                 // Start AI suggestion process
                 setSuggesting(true);
                 setShowSuggestions(true);
@@ -115,16 +120,29 @@ export default function ProjectForm({ onProjectCreated }: { onProjectCreated?: (
                 <div className="flex items-center gap-3 px-1 animate-fade-in" style={{ animationDelay: '200ms' }}>
                     <button
                         type="button"
-                        onClick={() => setUseAI(!useAI)}
-                        className={`group flex items-center gap-3 px-4 py-2 rounded-xl border transition-all ${useAI ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-foreground/5 border-border text-muted-foreground'}`}
+                        onClick={() => !isLimitReached && setUseAI(!useAI)}
+                        disabled={isLimitReached}
+                        className={`group flex items-center gap-3 px-4 py-2 rounded-xl border transition-all ${isLimitReached
+                            ? 'bg-red-500/10 border-red-500/30 text-red-400 opacity-80 cursor-not-allowed'
+                            : useAI
+                                ? 'bg-primary/10 border-primary/30 text-primary'
+                                : 'bg-foreground/5 border-border text-muted-foreground'
+                            }`}
                     >
-                        <div className={`p-1 rounded-lg transition-colors ${useAI ? 'bg-primary text-white shadow-lg shadow-primary/30' : 'bg-foreground/10 text-muted-foreground'}`}>
-                            {useAI ? <Sparkles size={14} strokeWidth={2.5} /> : <X size={14} strokeWidth={2.5} />}
+                        <div className={`p-1 rounded-lg transition-colors ${isLimitReached
+                            ? 'bg-red-500/20 text-red-500'
+                            : useAI
+                                ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                                : 'bg-foreground/10 text-muted-foreground'
+                            }`}>
+                            {isLimitReached ? <X size={14} strokeWidth={2.5} /> : (useAI ? <Sparkles size={14} strokeWidth={2.5} /> : <X size={14} strokeWidth={2.5} />)}
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest">KI-Vorschläge {useAI ? 'aktiv' : 'aus'}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">
+                            {isLimitReached ? 'Limit erreicht' : `KI-Vorschläge ${useAI ? 'aktiv' : 'aus'}`}
+                        </span>
                     </button>
                     <p className="text-[9px] text-muted-foreground/40 font-medium leading-none max-w-[200px]">
-                        Lass dir automatisch erste Aufgaben für dein Projekt vorschlagen.
+                        {isLimitReached ? 'Upgrade deinen Plan für mehr KI.' : 'Lass dir automatisch erste Aufgaben für dein Projekt vorschlagen.'}
                     </p>
                 </div>
             </form>

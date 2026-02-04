@@ -44,13 +44,24 @@ export default function FilesDialog({ projectId, isOpen, onClose }: FilesDialogP
         }
     }, [isOpen, projectId]);
 
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
     const handleDelete = async (id: string) => {
-        if (!confirm("Datei wirklich löschen?")) return;
-        try {
-            await deleteFile(id);
-            setFiles(prev => prev.filter(f => f.id !== id));
-        } catch (error: any) {
-            alert(`Fehler beim Löschen: ${error.message}`);
+        if (confirmDeleteId === id) {
+            // Second click: Perform delete
+            try {
+                await deleteFile(id);
+                setFiles(prev => prev.filter(f => f.id !== id));
+                setConfirmDeleteId(null);
+            } catch (error: any) {
+                alert(`Fehler beim Löschen: ${error.message}`);
+                setConfirmDeleteId(null);
+            }
+        } else {
+            // First click: Request confirmation
+            setConfirmDeleteId(id);
+            // Auto-reset after 3 seconds if not confirmed
+            setTimeout(() => setConfirmDeleteId(current => current === id ? null : current), 3000);
         }
     };
 
@@ -113,10 +124,17 @@ export default function FilesDialog({ projectId, isOpen, onClose }: FilesDialogP
                                         </div>
                                         <button
                                             onClick={() => handleDelete(file.id)}
-                                            className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors group-hover:opacity-100"
-                                            title="Löschen"
+                                            className={`p-2 rounded-lg transition-all duration-200 ${confirmDeleteId === file.id
+                                                    ? 'bg-red-500 text-white w-24'
+                                                    : 'text-muted-foreground hover:text-red-500 hover:bg-red-500/10 group-hover:opacity-100'
+                                                }`}
+                                            title={confirmDeleteId === file.id ? "Wirklich löschen?" : "Löschen"}
                                         >
-                                            <Trash2 size={16} />
+                                            {confirmDeleteId === file.id ? (
+                                                <span className="text-xs font-bold">Löschen?</span>
+                                            ) : (
+                                                <Trash2 size={16} />
+                                            )}
                                         </button>
                                     </div>
                                 ))}

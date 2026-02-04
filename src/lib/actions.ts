@@ -406,7 +406,7 @@ async function checkAdmin() {
 export async function getAllUsers() {
     await checkAdmin();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return await (prisma as any).user.findMany({
+    const users = await (prisma as any).user.findMany({
         orderBy: { createdAt: "desc" },
         select: {
             id: true,
@@ -421,6 +421,14 @@ export async function getAllUsers() {
             lastTokenReset: true,
         }
     });
+
+    // Cast BigInt to Number for client safety
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return users.map((u: any) => ({
+        ...u,
+        aiTokenLimit: Number(u.aiTokenLimit || 0),
+        aiTokensUsed: Number(u.aiTokensUsed || 0),
+    }));
 }
 
 export async function updateUserStatus(userId: string, status: "WAITING" | "APPROVED" | "REJECTED") {
@@ -448,7 +456,7 @@ export async function updateUserAiLimit(userId: string, limit: number) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (prisma as any).user.update({
         where: { id: userId },
-        data: { aiTokenLimit: limit },
+        data: { aiTokenLimit: BigInt(limit) },
     });
     revalidatePath("/admin");
 }

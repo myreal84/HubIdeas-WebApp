@@ -41,8 +41,8 @@ model User {
   sharedProjects Project[] @relation("ProjectCollaborators")
   createdTodos   Todo[]    @relation("TodoCreator")
   createdNotes   Note[]    @relation("NoteCreator")
-  aiTokenLimit   Int       @default(50000)
-  aiTokensUsed   Int       @default(0)
+  aiTokenLimit   BigInt    @default(50000)
+  aiTokensUsed   BigInt    @default(0)
   lastTokenReset DateTime  @default(now())
   storageLimit   BigInt    @default(104857600) // 100MB in bytes
   storageUsed    BigInt    @default(0)

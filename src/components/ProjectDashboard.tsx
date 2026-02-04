@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { ListChecks, ChevronRight, Sparkles, Zap, Clock, Search } from 'lucide-react';
 import MainMenu from './MainMenu';
+import BrainstormChat from './BrainstormChat';
 import { Project } from '@/lib/types';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,13 +21,16 @@ interface ProjectDashboardProps {
     isAdmin?: boolean;
     pendingUsersCount?: number;
     storageUsage?: { limit: string, used: string };
+    aiTokensUsed?: number;
+    aiTokenLimit?: number;
 }
 
-export default function ProjectDashboard({ activeProjects, archivedProjects, vapidPublicKey, isAdmin, pendingUsersCount, storageUsage }: ProjectDashboardProps) {
+export default function ProjectDashboard({ activeProjects, archivedProjects, vapidPublicKey, isAdmin, pendingUsersCount, storageUsage, aiTokensUsed = 0, aiTokenLimit = 2000 }: ProjectDashboardProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchArchive, setSearchArchive] = useState(false);
     const [sortOption, setSortOption] = useState("smart");
     const [randomSeed, setRandomSeed] = useState(0);
+    const [isBrainstorming, setIsBrainstorming] = useState(false);
 
     const activeCount = activeProjects.length;
 
@@ -147,7 +151,18 @@ export default function ProjectDashboard({ activeProjects, archivedProjects, vap
                 isAdmin={isAdmin}
                 pendingUsersCount={pendingUsersCount}
                 storageUsage={storageUsage}
+                onBrainstormClick={() => setIsBrainstorming(true)}
             />
+
+            <AnimatePresence>
+                {isBrainstorming && (
+                    <BrainstormChat
+                        onClose={() => setIsBrainstorming(false)}
+                        aiTokensUsed={aiTokensUsed}
+                        aiTokenLimit={aiTokenLimit}
+                    />
+                )}
+            </AnimatePresence>
 
             {sortOption === 'smart' ? (
                 <>

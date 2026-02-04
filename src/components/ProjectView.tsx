@@ -749,9 +749,14 @@ export default function ProjectView({ project, isAdmin, pendingUsersCount, aiTok
                     projectId={project.id}
                     projectName={project.name}
                     isArchived={project.isArchived}
-                    onOpenChat={() => setIsChatOpen(true)}
+                    onOpenChat={() => {
+                        if ((aiTokensUsed ?? 0) < (aiTokenLimit ?? 0)) {
+                            setIsChatOpen(true)
+                        }
+                    }}
                     isAdmin={isAdmin}
                     pendingUsersCount={pendingUsersCount}
+                    disableChat={(aiTokensUsed ?? 0) >= (aiTokenLimit ?? 0)}
                 />
 
                 <FilesDialog
